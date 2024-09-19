@@ -7,5 +7,5 @@ May add timeline width adjustment at some point as well.
 
 
 # Installation:
-Install a userscript addon for your browser, preferably TamperMonkey.</br>
+Install a userscript addon for your browser, preferably [TamperMonkey](https://www.tampermonkey.net/).</br>
 Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js), or open the RAW of `bsky_enhancer.user.js` in this repository.
