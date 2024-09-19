@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.1
+// @version      0.13
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @match        https://bsky.app/*
@@ -59,7 +59,7 @@ function processXMLOpen(thisRef, method, url)
             const m3uText = e.target.responseText;
             if(m3uText.includes('#EXT-X-STREAM-INF'))
             {
-                console.log("filtered m3u");
+                let m3u = filterVideoSources(m3uText);
                 Object.defineProperty(thisRef, 'response', { writable: true });
                 Object.defineProperty(thisRef, 'responseText', { writable: true });
                 thisRef.response = thisRef.responseText = m3u;
