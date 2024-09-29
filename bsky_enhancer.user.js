@@ -4,6 +4,8 @@
 // @version      0.13
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
+// @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
+// @downloadURL  https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
 // @match        https://bsky.app/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
