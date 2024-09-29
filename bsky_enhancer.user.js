@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.13
+// @version      0.15
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
