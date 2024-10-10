@@ -142,6 +142,7 @@ function formatFilenameDate(date)
     return isoDate.toISOString("YYYY-MM-DD").split('T')[0];
 }
 
+// Thanks to `https://github.com/FerroEduardo/bskye` for this nifty little API call info
 function getVideoUrl(authorDid, videoCid) {
   const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
   return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
