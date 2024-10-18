@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.21
+// @version      0.22
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -138,6 +138,15 @@ async function processPostItem(post)
     buttonBar.appendChild(dlBtn);
 }
 
+
+function findPostLink(post)
+{
+	let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
+    if(postInfo) { return postInfo.href; }
+
+    return window.location.href.includes('/profile/') ? window.location.href : null;
+}
+
 function copyPostLink(post, linkBtn)
 {
     if(linkBtn.hasAttribute('clicked')) { return; }
@@ -161,8 +170,7 @@ function copyPostLink(post, linkBtn)
 
 function downloadPostVid(post, vidElem, dlBtn)
 {
-    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
-    let saveData = postInfo != null ? getSaveDataFromPostInfo(postInfo) : getSaveDataFromPost(post);
+    let saveData = getSaveDataFromPost(post);
     let vidUrl = vidElem.src;
 
     if(vidElem?.poster && vidElem.poster.includes('did%3Aplc'))
@@ -177,40 +185,34 @@ function downloadPostVid(post, vidElem, dlBtn)
     download(vidUrl, filename).then(() => { console.log("done"); removeButtonEffect(dlBtn); }).catch(() => { removeButtonEffect(dlBtn); }, 20000);
 }
 
-function getSaveDataFromPostInfo(postInfo)
-{
-    let link = postInfo.href;
-    let date = postInfo.getAttribute('data-tooltip');
-    date = formatFilenameDate(date);
-    let splitLink = link.split('/profile/')[1].split('/post/');
-    let username = splitLink[0];
-    let postID = splitLink[1];
-    if(!username.endsWith('bsky.social')) { username += '_(BSKY)'; }
-    return {username: username, date: date, postID: postID };
-}
-
-function findPostLink(post)
-{
-    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
-    if(postInfo) { return postInfo.href; }
-    if(window.location.href.startsWith('https://bsky.app/profile/')) { return window.location.href; }
-    return null;
-}
-
 function getSaveDataFromPost(post)
 {
-    let date = post.querySelector('div:has(> button[aria-label="Who can reply"]) > div')?.innerText;
-    date = formatFilenameDate(date);
-    let url = findPostLink(post)?.split('/post/');
+    let link = "";
+    let date = "";
     let username = "";
     let postID = "";
-    if(url.length > 1)
+
+    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
+    if(postInfo)
     {
-        username = url[0].split("/profile/")[1];
-        postID = url[1];
+        link = postInfo.href;
+        date = formatFilenameDate(postInfo.getAttribute('data-tooltip'));
+    }
+    else
+    {
+        date = post.querySelector('div:has(> button[aria-label="Who can reply"]) > div')?.innerText;
+        date = formatFilenameDate(date);
+        link = window.location.href.includes('/profile/') ? window.location.href : null;
+    }
+    if(link != null)
+    {
+        let splitLink = link.split('/profile/')[1].split('/post/');
+        username = splitLink[0];
+        postID = splitLink[1];
+        if(!username.endsWith('bsky.social')) { username += '_(BSKY)'; }
     }
 
-    return {username: username, date: date, postID: postID};
+    return {username: username, date: date, postID: postID };
 }
 
 function formatFilenameDate(date)
