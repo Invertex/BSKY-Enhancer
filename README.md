@@ -2,7 +2,7 @@
 Quality of life improvements for BSKY, including enforced highest quality video playback.
 
 ## FEATURES:
-- Source-quality video
+- Source-quality video playback. `(Seeking the video won't work on Chrome, due to long-standing Chrome issue.. Works on Firefox)`
 - Download video button below posts.
 - Download filename with proper attribution e.g: `porigoshi.bsky.social_2024-09-13_3l3zt66nogq2o.mp4`, so files are user and date sorted. Contains post ID to find that post on their account again too!
 - Adds a "Copy Link" button below videos to automatically copy it as a `bskye.app` link, so the video will embed properly when pasted elsewhere.
