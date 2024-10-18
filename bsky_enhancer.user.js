@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.18
+// @version      0.19
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -10,22 +10,79 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
+// @grant        navigation
 // @grant        unsafeWindow
 // @run-at       document-start
 // @require      https://github.com/Invertex/Invertex-Userscript-Tools/raw/f8b74b4238884620734e5d813070135bd224e7ae/userscript_tools.js
 // ==/UserScript==
 
-(function() {
-    'use strict';
-    processPage();
+addGlobalStyle(`svg.vxDlSVG > path {
+    fill: rgba(255, 255, 255, 0.5);
+}`);
 
-    window.addEventListener('popstate', function (event) {
-	processPage();
-});
-    navigation.addEventListener("navigate", e => {
-	processPage();
-});
+(async function() {
+    'use strict';
+    let root = await awaitElem(document, '#root', argsChildAndSub);
+    let vids = root.querySelectorAll('div[data-testid^="feedItem-"] video,div[data-testid^="postThreadItem-"] video');
+    vids.forEach(processVidElem);
+    watchForAddedNodes(root, false, { attributes: false, childList: true, subtree: true }, onNodesAdded);
 })();
+
+function doOnAttributeChange2(elem, onChange, repeatOnce = false)
+{
+    let rootObserver = new MutationObserver((mutes, obvs) => {
+        obvs.disconnect();
+        onChange(elem);
+        if (repeatOnce == true) { return; }
+        obvs.observe(elem, { childList: false, subtree: false, attributes: true })
+    });
+    rootObserver.observe(elem, { childList: false, subtree: false, attributes: true });
+}
+
+function vidForceHQ(vidElem)
+{
+    let linksplit = vidElem.poster.split('/');
+    for(let i = 1; i < linksplit.length; i++)
+    {
+        let linkpart = linksplit[i];
+        if(linkpart.includes('did%3Aplc'))
+        {
+            let did = linkpart;
+            let cid = linksplit[i + 1];
+            vidElem.preload = true;
+            let hqURL = getVideoUrl(did,cid);
+            vidElem.src = hqURL;
+
+            break;
+        }
+    }
+    let postitem = vidElem.closest('div[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]');
+    processPostItem(postitem);
+}
+
+function onNodesAdded(nodes)
+{
+    if (nodes.length == 0) { return; }
+    for(let i = 0; i < nodes.length; i++)
+    {
+        let child = nodes[i];
+        if(child != null)
+        {
+            let vid = child?.querySelector('video');
+            if(vid)
+            {
+                processVidElem(vid);
+            }
+        }
+    }
+}
+
+function processVidElem(vid)
+{
+    if(addHasAttribute(vid, "bskyHD")) { return; }
+    vidForceHQ(vid);
+    doOnAttributeChange2(vid, vidForceHQ);
+}
 
 async function processPage(){
     processPostThread();
@@ -71,14 +128,13 @@ function processFeedPosts(posts)
     });
 }
 
-async function processPost(post)
+async function processPostItem(post)
 {
     if(!post || addHasAttribute(post, "bskyEN")) { return; }
-    post = await awaitElem(post, '[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]', argsChildAndSub);
-    let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"]', argsChildAndSub);
+    let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"],video[src*=".webm"],video[src*=".mp4"]', argsChildAndSub);
     if(vid == null) { return; }
 
-    let buttonBar = post.querySelector('div:has(> div > div[data-testid="likeBtn"])');
+    let buttonBar = await awaitElem(post, 'div:has(> div > div[data-testid="likeBtn"])', argsChildAndSub);
 
     let dlBtn = createDLButton();
     dlBtn.onclick = (e) => {
@@ -90,14 +146,26 @@ async function processPost(post)
     buttonBar.appendChild(dlBtn);
 }
 
+async function processPost(post)
+{
+    if(!post || addHasAttribute(post, "bskyEN")) { return; }
+    post = await awaitElem(post, '[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]', argsChildAndSub);
+    await processPostItem(post);
+}
+
 function downloadPostVid(post, vidElem, dlBtn)
 {
-    let postInfo = post.querySelector('a[href*=".social/post/"]');
+    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
     let saveData = postInfo != null ? getSaveDataFromPostInfo(postInfo) : getSaveDataFromPost(post);
-    let posterParts = vidElem.poster.split('/watch/')[1].split('/');
-    let did = posterParts[0].replace('%3A',':');
-    let cid = posterParts[1];
-    let vidUrl = getVideoUrl(did, cid);
+    let vidUrl = vidElem.src;
+
+    if(vidElem?.poster && vidElem.poster.includes('did%3Aplc'))
+    {
+        let posterParts = vidElem.poster.split('/watch/')[1].split('/');
+        let did = posterParts[0].replace('%3A',':');
+        let cid = posterParts[1];
+        vidUrl = getVideoUrl(did, cid);
+    }
 
     let filename = `${saveData.username}_${saveData.date}_${saveData.postID}.mp4`;
     download(vidUrl, filename).then(() => { console.log("done"); removeButtonEffect(dlBtn); }).catch(() => { removeButtonEffect(dlBtn); }, 20000);
@@ -111,7 +179,7 @@ function getSaveDataFromPostInfo(postInfo)
     let splitLink = link.split('/profile/')[1].split('/post/');
     let username = splitLink[0];
     let postID = splitLink[1];
-
+    if(!username.endsWith('bsky.social')) { username += '_(BSKY)'; }
     return {username: username, date: date, postID: postID };
 }
 function getSaveDataFromPost(post)
@@ -192,10 +260,10 @@ const filterVideoSources = function (m3u8)
     return new_playlist;
 };
 
-
 function processXMLOpen(thisRef, method, url)
 {
-     if (url.includes('playlist.m3u8'))
+    return;
+    if (url.includes('playlist.m3u8'))
     {
         thisRef.addEventListener('readystatechange', function (e)
         {
@@ -210,6 +278,7 @@ function processXMLOpen(thisRef, method, url)
         });
     }
 }
+
 
 //Intercept video playlist response so we can modify it
 var openOpen = unsafeWindow.XMLHttpRequest.prototype.open;
