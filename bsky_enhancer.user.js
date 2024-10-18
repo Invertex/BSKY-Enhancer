@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.19
+// @version      0.20
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -10,15 +10,45 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
-// @grant        navigation
+// @grant        GM_setClipboard
 // @grant        unsafeWindow
 // @run-at       document-start
 // @require      https://github.com/Invertex/Invertex-Userscript-Tools/raw/f8b74b4238884620734e5d813070135bd224e7ae/userscript_tools.js
 // ==/UserScript==
 
-addGlobalStyle(`svg.vxDlSVG > path {
+addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
+}
+.bskyhd-copy-link{
+  background-color: transparent;
+  border: none;
+}
+.bskyhd-copy-link[clicked] > svg.vxLinkSVG > path
+{
+  animation-iteration-count: infinite;
+  animation-duration: 2s;
+  animation-name: copylink-animation;
+  pointer-events: none !important;
+}
+.bskyhd-copy-link[clicked], .bskyhd-copy-link[clicked] > svg.vxLinkSVG
+{
+  pointer-events: none !important;
+}
+@keyframes copylink-animation
+{
+    0%
+    {
+        fill: rgba(255, 50, 40, 0.95);
+    }
+    100%
+    {
+        fill: rgba(255, 50, 40, 0.05);
+    }
 }`);
+
+const linkSVG = `<svg class="vxLinkSVG vxDlSVG" xmlns="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" version="1.1" id="Layer_1" x="0px" y="0px" width="24" height="24" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve" data-google-analytics-opt-out="">
+<path fill="white" d="M459.654,233.373l-90.531,90.5c-49.969,50-131.031,50-181,0c-7.875-7.844-14.031-16.688-19.438-25.813  l42.063-42.063c2-2.016,4.469-3.172,6.828-4.531c2.906,9.938,7.984,19.344,15.797,27.156c24.953,24.969,65.563,24.938,90.5,0  l90.5-90.5c24.969-24.969,24.969-65.563,0-90.516c-24.938-24.953-65.531-24.953-90.5,0l-32.188,32.219  c-26.109-10.172-54.25-12.906-81.641-8.891l68.578-68.578c50-49.984,131.031-49.984,181.031,0  C509.623,102.342,509.623,183.389,459.654,233.373z M220.326,382.186l-32.203,32.219c-24.953,24.938-65.563,24.938-90.516,0  c-24.953-24.969-24.953-65.563,0-90.531l90.516-90.5c24.969-24.969,65.547-24.969,90.5,0c7.797,7.797,12.875,17.203,15.813,27.125  c2.375-1.375,4.813-2.5,6.813-4.5l42.063-42.047c-5.375-9.156-11.563-17.969-19.438-25.828c-49.969-49.984-131.031-49.984-181.016,0  l-90.5,90.5c-49.984,50-49.984,131.031,0,181.031c49.984,49.969,131.031,49.969,181.016,0l68.594-68.594  C274.561,395.092,246.42,392.342,220.326,382.186z"/>
+</svg>`;
 
 (async function() {
     'use strict';
@@ -136,6 +166,18 @@ async function processPostItem(post)
 
     let buttonBar = await awaitElem(post, 'div:has(> div > div[data-testid="likeBtn"])', argsChildAndSub);
 
+    let copyBtn = document.createElement("button");
+    copyBtn.className = "bskyhd-copy-link";
+    copyBtn.innerHTML = linkSVG;
+    copyBtn.title = "Copy Video Embed Compatible Link";
+    copyBtn.onclick = (e)=>
+    {
+        e.stopPropagation();
+        copyPostLink(post, copyBtn);
+    };
+    buttonBar.appendChild(copyBtn);
+
+
     let dlBtn = createDLButton();
     dlBtn.onclick = (e) => {
         e.stopPropagation();
@@ -151,6 +193,27 @@ async function processPost(post)
     if(!post || addHasAttribute(post, "bskyEN")) { return; }
     post = await awaitElem(post, '[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]', argsChildAndSub);
     await processPostItem(post);
+}
+
+function copyPostLink(post, linkBtn)
+{
+    if(linkBtn.hasAttribute('clicked')) { return; }
+    let link = findPostLink(post);
+    if(link)
+    {
+        linkBtn.setAttribute('clicked', '');
+        if(link.startsWith('https://bsky.app/'))
+        {
+            link = link.replace('https://bsky.app/','https://bskye.app/');
+        }
+        navigator.clipboard.writeText(link);
+        window.setTimeout(()=>{
+            if(linkBtn.hasAttribute('clicked'))
+            {
+             linkBtn.removeAttribute('clicked');
+            }
+        }, 2000);
+    }
 }
 
 function downloadPostVid(post, vidElem, dlBtn)
@@ -182,22 +245,26 @@ function getSaveDataFromPostInfo(postInfo)
     if(!username.endsWith('bsky.social')) { username += '_(BSKY)'; }
     return {username: username, date: date, postID: postID };
 }
+
+function findPostLink(post)
+{
+    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
+    if(postInfo) { return postInfo.href; }
+    if(window.location.href.startsWith('https://bsky.app/profile/')) { return window.location.href; }
+    return null;
+}
+
 function getSaveDataFromPost(post)
 {
     let date = post.querySelector('div:has(> button[aria-label="Who can reply"]) > div')?.innerText;
     date = formatFilenameDate(date);
-    let url = window.location.href.split('/post/');
+    let url = findPostLink(post)?.split('/post/');
     let username = "";
     let postID = "";
     if(url.length > 1)
     {
         username = url[0].split("/profile/")[1];
         postID = url[1];
-    }
-    if(username == "")
-    {
-        let userlink = post.querySelector('a[href*="/profile/"]');
-        if(userlink) { username = userlink.href.split('/profile/')[1] }
     }
 
     return {username: username, date: date, postID: postID};
@@ -262,7 +329,6 @@ const filterVideoSources = function (m3u8)
 
 function processXMLOpen(thisRef, method, url)
 {
-    return;
     if (url.includes('playlist.m3u8'))
     {
         thisRef.addEventListener('readystatechange', function (e)
