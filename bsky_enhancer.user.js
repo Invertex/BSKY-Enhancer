@@ -301,7 +301,7 @@ unsafeWindow.XMLHttpRequest.prototype.open = exportFunction(function(method, url
 
 (async function() {
 
-    let root = await awaitElem(document, '#root', argsChildAndSub);
+    let root = await awaitElem(document, 'body #root', argsChildAndSub);
     let vids = root.querySelectorAll('div[data-testid^="feedItem-"] video,div[data-testid^="postThreadItem-"] video');
     vids.forEach(processVidElem);
     watchForAddedNodes(root, false, { attributes: false, childList: true, subtree: true }, onNodesAdded);
