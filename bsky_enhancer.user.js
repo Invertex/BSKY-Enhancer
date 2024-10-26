@@ -200,7 +200,7 @@ function getSaveDataFromPost(post)
     }
     else
     {
-        date = post.querySelector('div:has(> button[aria-label="Who can reply"]) > div')?.innerText;
+        date = post.querySelector('div:has(> button[aria-label="Edit who can reply"]) > div')?.innerText;
         date = formatFilenameDate(date);
         link = window.location.href.includes('/profile/') ? window.location.href : null;
     }
