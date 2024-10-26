@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.22
+// @version      0.23
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -17,6 +17,8 @@
 // ==/UserScript==
 
 'use strict';
+
+const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
 
 addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
@@ -65,19 +67,22 @@ function doOnAttributeChange2(elem, onChange, repeatOnce = false)
 
 function vidForceHQ(vidElem)
 {
-    let linksplit = vidElem.poster.split('/');
-    for(let i = 1; i < linksplit.length; i++)
+    if (is_chrome == false)
     {
-        let linkpart = linksplit[i];
-        if(linkpart.includes('did%3Aplc'))
+        let linksplit = vidElem.poster.split('/');
+        for(let i = 1; i < linksplit.length; i++)
         {
-            let did = linkpart;
-            let cid = linksplit[i + 1];
-            vidElem.preload = "auto";
-            let hqURL = getVideoUrl(did,cid);
-            vidElem.src = hqURL;
+            let linkpart = linksplit[i];
+            if(linkpart.includes('did%3Aplc'))
+            {
+                let did = linkpart;
+                let cid = linksplit[i + 1];
+                vidElem.preload = "auto";
+                let hqURL = getVideoUrl(did,cid);
+                vidElem.src = hqURL;
 
-            break;
+                break;
+            }
         }
     }
     let postitem = vidElem.closest('div[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]');
