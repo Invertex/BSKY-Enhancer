@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.23
+// @version      0.24
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -119,7 +119,7 @@ async function processPostItem(post)
     let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"],video[src*=".webm"],video[src*=".mp4"]', argsChildAndSub);
     if(vid == null) { return; }
 
-    let buttonBar = await awaitElem(post, 'div:has(> div > div[data-testid="likeBtn"])', argsChildAndSub);
+    let buttonBar = await awaitElem(post, 'div:has(> div > [data-testid="likeBtn"])', argsChildAndSub);
 
     let copyBtn = document.createElement("button");
     copyBtn.className = "bskyhd-copy-link";
