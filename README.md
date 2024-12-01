@@ -1,5 +1,5 @@
 # BSKY-Enhancer
-Quality of life improvements for BSKY, including enforced highest quality video playback.
+QoL improvements for BSKY, including video download and higher quality playback.
 
 ## FEATURES:
 - Source-quality video playback. `(Seeking the video won't work on Chrome, due to long-standing Chrome issue.. Works on Firefox)`
