@@ -1,12 +1,15 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.25
+// @version      0.26
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
 // @downloadURL  https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
 // @match        https://bsky.app/*
+// @connect      self
+// @connect      bsky.social
+// @connect      bsky.network
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
@@ -20,6 +23,33 @@
 
 var bear = "";
 var myDID = null;
+const GM_OpenInTabMissing = (typeof GM_openInTab === 'undefined');
+const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
+
+function download2(url, filename, timeout = -1)
+{
+     return new Promise((resolve, reject) =>
+    {
+         const dl = GM_download(
+             {
+                 name: filename,
+                 url: url,
+                 onload: resolve,
+                 onerror: reject,
+                 ontimeout: reject,
+                 saveAs: true
+             });
+        if(timeout >= 0)
+        {
+              window.setTimeout(()=> {
+                dl?.abort();
+                reject(null);
+            }, timeout);
+        }
+    });
+}
+
+/** // Future Timeline Resizing helpers
 //Text content
 const style_hideTextContent = `div[data-testid^="feedItem"] div[data-testid^="contentHider"] > div:not(:has(img,video)) { display: none; }`;
 
@@ -43,7 +73,7 @@ const style_LeftAvatarPanel = `div[data-testid^="feedItem"] div:has(> div > div[
 
 //Remove padding
 const style_RemovePadding = `div[data-testid^="feedItem"] > div { padding: 0px !important; }
-div[data-testid^="feedItem"] div:has(> div[data-testid^="contentHider"]) div[style*="margin-top"] { margin-top: 0px !important; }`;
+div[data-testid^="feedItem"] div:has(> div[data-testid^="contentHider"]) div[style*="margin-top"] { margin-top: 0px !important; }`;*/
 
 addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
@@ -84,29 +114,74 @@ div.bskyIVX_followIcon {
     margin-top: 1.8em;
 }`);
 
+
+addGlobalStyle(`@-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+div#thd_button_Download[downloading] {
+  pointer-events: none !important;
+}
+div#thd_button_Download[downloading] svg {
+  pointer-events: none !important;
+  background-color: rgba(143, 44, 242, 0.5);
+  border-radius: 12px;
+  animation-iteration-count: infinite;
+  animation-duration: 2s;
+  animation-name: dl-animation;
+}
+div#thd_button_Download[downloading] svg > path {
+    fill: rgba(255,255,255,0.2);
+}
+div[thd_customctx]:has(video[downloading]) {
+  border-style: solid;
+  border-color: cyan;
+  border-width: 3px;
+  border-radius: 0px 12px 12px 0px;
+  animation-iteration-count: infinite;
+  animation-duration: 2s;
+  animation-name: dl-animation;
+}
+@keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+.loader { border: 16px solid #f3f3f373; display: -webkit-box; display: -ms-flexbox; display: flex; margin: auto; border-top: 16px solid #3498db99; border-radius: 50%; width: 120px; height: 120px; -webkit-animation: spin 2s linear infinite; animation: spin 2s linear infinite;}
+.context-menu { position: absolute; text-align: center; margin: 0px; background: #040404; border: 1px solid #0e0e0e; border-radius: 5px;}
+.context-menu ul { padding: 0px; margin: 0px; min-width: 190px; list-style: none;}
+.context-menu ul li { padding-bottom: 7px; padding-top: 7px; border: 1px solid #0e0e0e; color:#c1bcbc; font-family: sans-serif; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;}
+.context-menu ul li:hover { background: #202020;}
+.thd_settings_collapsible { background-color:rgb(28, 30, 34); color:rgb(180, 183, 173); cursor:pointer; width:100%; border:none; text-align:left; outline:none; font-size:15px; border-radius:11px 11px 0 0; padding: 8px 14px 8px}
+.thd_settings_collapsible:after { content: "Show \u2795"; font-size: 13px; float: right; margin-left: 5px; }
+.thd_settings_active, .thd_settings_collapsible:hover { background-color:rgb(38, 40, 44); }
+.thd_settings_active:after { content: "Hide \u2796"; }
+.thd_settings_content{ overflow:hidden; background-color:rgb(22, 24, 28); -webkit-box-orient: vertical; -webkit-box-direction: normal; -ms-flex-flow: column; flex-flow: column; display: -webkit-box; display: -ms-flexbox; display: flex; padding-bottom: 6px; }
+              .thd_settings_content_closed { display: none !important; }
+.thd_settings_toggle { margin: 0.01em 0.4em 0.01em; border-style: solid; border-width: 0.015em; border-color: #101010; background-color: #202020; border-radius:6px; color: rgb(100, 100, 100); }
+.thd_settings_toggle:hover { background-color: #393838; border-width: 0.045em; border-color: #505050; cursor:pointer; color: rgb(210, 210 210); }
+.thd_settings_toggle_enabled { background-color: #292828; border-width: 0.045em; border-color: #404040; cursor:pointer; color: rgb(190, 190, 190); }
+`);
+
+
 const linkSVG = `<svg class="vxLinkSVG vxDlSVG" xmlns="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" version="1.1" id="Layer_1" x="0px" y="0px" width="24" height="24" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve" data-google-analytics-opt-out="">
 <path fill="white" d="M459.654,233.373l-90.531,90.5c-49.969,50-131.031,50-181,0c-7.875-7.844-14.031-16.688-19.438-25.813  l42.063-42.063c2-2.016,4.469-3.172,6.828-4.531c2.906,9.938,7.984,19.344,15.797,27.156c24.953,24.969,65.563,24.938,90.5,0  l90.5-90.5c24.969-24.969,24.969-65.563,0-90.516c-24.938-24.953-65.531-24.953-90.5,0l-32.188,32.219  c-26.109-10.172-54.25-12.906-81.641-8.891l68.578-68.578c50-49.984,131.031-49.984,181.031,0  C509.623,102.342,509.623,183.389,459.654,233.373z M220.326,382.186l-32.203,32.219c-24.953,24.938-65.563,24.938-90.516,0  c-24.953-24.969-24.953-65.563,0-90.531l90.516-90.5c24.969-24.969,65.547-24.969,90.5,0c7.797,7.797,12.875,17.203,15.813,27.125  c2.375-1.375,4.813-2.5,6.813-4.5l42.063-42.047c-5.375-9.156-11.563-17.969-19.438-25.828c-49.969-49.984-131.031-49.984-181.016,0  l-90.5,90.5c-49.984,50-49.984,131.031,0,181.031c49.984,49.969,131.031,49.969,181.016,0l68.594-68.594  C274.561,395.092,246.42,392.342,220.326,382.186z"/>
 </svg>`;
 
 const followSVG = `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="25" height="25" viewBox="0 0 24 24">
-<path d="M12 3A9 9 0 1 0 12 21A9 9 0 1 0 12 3Z" fill="rgb(100, 180, 255)"></path><path d="M12,22C6.5,22,2,17.5,2,12C2,6.5,6.5,2,12,2c5.5,0,10,4.5,10,10C22,17.5,17.5,22,12,22z M12,4c-4.4,0-8,3.6-8,8 c0,4.4,3.6,8,8,8c4.4,0,8-3.6,8-8C20,7.6,16.4,4,12,4z" fill="#dee82acc" class="bskyEN_follow_outline"></path><path d="M11 7H13V17H11z"></path><path d="M7 11H17V13H7z"></path>
+<path d="M12 3A9 9 0 1 0 12 21A9 9 0 1 0 12 3Z" fill="rgb(75,123,177)"></path><path d="M12,22C6.5,22,2,17.5,2,12C2,6.5,6.5,2,12,2c5.5,0,10,4.5,10,10C22,17.5,17.5,22,12,22z M12,4c-4.4,0-8,3.6-8,8 c0,4.4,3.6,8,8,8c4.4,0,8-3.6,8-8C20,7.6,16.4,4,12,4z" fill="rgb(80,77,77)" class="bskyEN_follow_outline"></path><path d="M11 7H13V17H11z"></path><path d="M7 11H17V13H7z"></path>
 </svg>`;
-
-const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
 
 /*** CLASSES ***/
 class BSKYPost
 {
     static cache = new Map();
 
+    embed = null;
+    embedRecord = null;
     video = null;
     images = null;
+    hasMedia = false;
     followIcon = null;
+    recordWithMedia = false;
 
     get URI() { return this.Data.uri; }
     get CID() { return this.Data.cid; }
     get DID() { return this.Data.author.did; }
-    get Handle() { return this.Data.author; }
+    get Handle() { return this.Data.author.handle; }
 
     get Tags(){
         return this.Data?.record?.tags ?? [];
@@ -117,37 +192,13 @@ class BSKYPost
     }
 
     get VideoSource() {
-       return getVideoUrl(this.Data.author.did, this.video.ref.$link);
+       return getSourceURL(this.Data.author.did, this.video.ref.$link);
     }
 
     get PostDate()
     {
         return formatFilenameDate(this.Data.record.createdAt);
     }
-
-    get VideoIsDownloading() { return this.videoDLButton.hasAttribute('downloading'); }
-
-    static TryCreateNew(postData, newUserCache)
-    {
-        if(postData?.post?.author == null) { return null; }
-        let post = postData.post;
-
-        let postID = post.uri.split('feed.post/').slice(-1)[0];
-        let keyName = `${post.author.handle}/${postID}`;
-        if(!BSKYPost.cache.has(keyName))
-        {
-            let newPost = new BSKYPost(post, postID, newUserCache);
-            BSKYPost.cache.set(keyName, newPost);
-        }
-        if(post.replyCount > 0 && Object.hasOwn(post,"replies"))
-        {
-            for(let i = 0; i < post.replies.length; i++)
-            {
-                BSKYPost.TryCreateNew(post.replies[i], newUserCache) ;
-            }
-        }
-    }
-
 
     /*** EVENTS ***/
     onFollowingChanged = new EventTarget();
@@ -157,13 +208,31 @@ class BSKYPost
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
 
-    downloadVideoButtonClicked()
+    async downloadVideoButtonClicked()
     {
-        if(this.VideoIsDownloading) { return; }
-        this.setDownloadingState(true)
-        let filename = `${this.AuthorData.handle}_${this.PostDate}_${this.postID}.mp4`;
-        download(this.VideoSource, filename).then(() => { this.setDownloadingState(false); }).catch(() => { this.setDownloadingState(false); }, 120000);
+        if(this.isVideoDownloading) { return; }
+        this.setDownloadingState(true);
+        const ext = BSKYPost.extensionFromMimeType(this.Data.record.embed.video.mimeType);
+        let filename = `${this.Handle}_${this.PostDate}_${this.postID}${ext}`;
+        await download2(this.VideoSource, filename, 120000);
+        this.setDownloadingState(false);
     }
+
+    downloadImageClicked(imgThumbURL)
+    {
+        let imgData = this.getImageDataFromURL(imgThumbURL);
+
+        if(imgData)
+        {
+            var filename = "";
+            if(this.embedRecord.images.length > 1)
+            {
+                filename = `${this.Handle}_${this.PostDate}_${this.postID}_${imgData.index}${imgData.extension}`;
+            } else { filename = `${this.Handle}_${this.PostDate}_${this.postID}${imgData.extension}`; }
+            download2(imgData.urlSRC, filename);
+        }
+    }
+
 
     updateFollowIcon(followIcon, followStatus)
     {
@@ -174,6 +243,8 @@ class BSKYPost
     }
 
     /*** UTILITY ***/
+    get isVideoDownloading() { return this.videoDLButton.hasAttribute('downloading'); }
+
     setDownloadingState(downloading)
     {
         if(downloading == true) { this.videoDLButton.setAttribute('downloading', ''); }
@@ -202,33 +273,98 @@ class BSKYPost
         }
     }
 
-    /*** SETUP ***/
-    static async enforceHighQualityVideo(post, postData)
+    static extensionFromMimeType(mimeType)
     {
-        let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"],video[src*=".webm"],video[src*=".mp4"],video', argsChildAndSub);
-        if(vid == null) { return; }
-        vid.src = postData.VideoSource;
+        let importantPart = mimeType.split('/').at(-1);
+        switch(importantPart)
+        {
+            case "jpeg":
+                return ".jpg";
+            case "png":
+                return ".png";
+            case "webp":
+                return ".webp";
+            case "webm":
+                return ".webm";
+            case "gif":
+                return ".gif";
+            default:
+                return '.' + importantPart;
+        }
+
+        return '.' + importantPart;
     }
 
-    setupVideoDownloadButton()
+    getImageDataFromURL(imgThumbURL)
+    {
+        if(this.embedRecord.images == null) { return null; }
+        //const lastPart = imgThumbURL.split('/').at(-1);
+        for(let i = 0; i < this.embedRecord.images.length; i++)
+        {
+            let imgRecord = this.embedRecord.images[i];
+            if(Object.hasOwn(imgRecord, 'image')) {imgRecord = imgRecord.image; }
+            if(imgThumbURL.includes(imgRecord.ref.$link))
+            {
+//let imgRecord = this.embedRecord.images[i].image;
+                let extensionName = BSKYPost.extensionFromMimeType(imgRecord.mimeType);
+                let srcURL = getSourceURL(this.AuthorData.did, imgRecord.ref.$link);
+                console.log(this.AuthorData.did);
+                console.log(imgRecord.ref.$link);
+                return { url: imgRecord.fullsize, urlSRC:srcURL, index: i, extension: extensionName};
+            }
+        }
+
+        return null;
+    }
+
+
+    /*** SETUP ***/
+
+    async setupVideoElem()
     {
         this.videoDLButton = createDLButton();
         this.videoDLButton.onclick = (e) => {
             e.stopPropagation();
             this.downloadVideoButtonClicked();
         };
+
         this.buttonBar.appendChild(this.videoDLButton);
 
+        let vidElem = await awaitElem(this.postElem, 'video', argsChildAndSub);
+
+        if (vidElem == null) { return; }
+        let selTarget = vidElem.parentElement.parentElement.parentElement;
+
+        let selContext = new SelectionCtx(this, selTarget, false, true, vidElem);
+        addCustomCtxMenu(selContext);
+
         if (is_chrome == true) { return; }
-        BSKYPost.enforceHighQualityVideo(this.postElem, this);
+        vidElem.src = this.VideoSource;
     }
 
+    async setupImageElems()
+    {
+        let imageElemLoaded = await awaitElem(this.postElem, 'img[src*="/img/feed_"]', argsChildAndSub);
+        console.log("setup image elems");
+        console.log(this.embedRecord.images);
+        console.log(this);
+        let images = this.embedRecord.images;
+        let imgcnt = images.length;
+        for(let i = 0; i < imgcnt; i++)
+        {
+            let imgData = this.embedRecord.images[i];
+
+            let imgElem = await awaitElem(this.postElem, `img[src*="${imgData.image.ref.$link}"]`, argsChildAndSub);
+            let selContext = new SelectionCtx(this, imgElem, true, false);
+            addCustomCtxMenu(selContext);
+        }
+    }
 
     async processPostElement(post)
     {
         this.postElem = post;
 
-        var iconElem = this.postElem.querySelector('a[href^="/profile/"]:has(div[data-testid="userAvatarImage"])');
+        var iconElem = await awaitElem(this.postElem, 'a[href^="/profile/"]:has(div[data-testid="userAvatarImage"])', argsChildAndSub);
         var followIcon = document.createElement('div');
         followIcon.className = "bskyIVX_followIcon";
         followIcon.innerHTML = followSVG;
@@ -244,7 +380,7 @@ class BSKYPost
 
         this.buttonBar = this.postElem.querySelector('div:has(> div > [data-testid="likeBtn"])');
 
-        if(this.hasMedia)
+        if(this.embed != null)
         {
             this.copyBtn = document.createElement("button");
             this.copyBtn.className = "bskyhd-copy-link";
@@ -258,7 +394,35 @@ class BSKYPost
 
             this.buttonBar.appendChild(this.copyBtn);
 
-            if(this.video) { this.setupVideoDownloadButton(); }
+            if(this.video) {await this.setupVideoElem(); }
+            else { await this.setupImageElems(); }
+        }
+    }
+
+    static TryCreateNew(postData, newUserCache)
+    {
+        if(postData?.post?.author == null) {console.log("post null"); return null; }
+        let post = postData.post;
+
+        let postID = post.uri.split('feed.post/').at(-1);
+        let keyName = `${post.author.handle}/${postID}`;
+        console.log(keyName);
+        if(!BSKYPost.cache.has(keyName))
+        {
+            let newPost = new BSKYPost(post, postID, newUserCache);
+            BSKYPost.cache.set(keyName, newPost);
+        }
+        if(Object.hasOwn(postData, 'reply') && Object.hasOwn(postData.reply, 'root'))
+        {
+            BSKYPost.TryCreateNew({post: postData.reply.root}, newUserCache);
+            BSKYPost.TryCreateNew({post: postData.reply.parent}, newUserCache);
+        }
+        if(post.replyCount > 0 && Object.hasOwn(postData,"replies"))
+        {
+            for(let i = 0; i < postData.replies.length; i++)
+            {
+                BSKYPost.TryCreateNew(postData.replies[i], newUserCache) ;
+            }
         }
     }
 
@@ -267,7 +431,7 @@ class BSKYPost
         this.Data = postData;
         this.postID = postID;
         this.embed = this.Data?.embed;
-        this.hasMedia = this.embed != null;
+        this.hasMedia = this.embed != null && (this.embed.$type.includes('embed.images#') || this.embed.$type.includes('embed.video#') || this.embed.$type.includes('embed.recordWithMedia#'));
         this.video = null;
         this.images = null;
 
@@ -275,13 +439,21 @@ class BSKYPost
         {
             if(this.embed.$type.includes('.recordWithMedia'))
             {
-                this.quote = this.embed.record;
+                this.recordWithMedia = true;
+                console.log("is record with media");
+                this.quote = BSKYPost.TryCreateNew({post:this.embed.record.record}, newUserCache);
                 this.embed = this.embed.media;
+                this.embedRecord = this.Data.record.embed.media;
             }
+            else
+            {
+                this.embedRecord = this.Data.record.embed;
+            }
+            console.log(this);
             this.images = this.embed?.images ?? [];
+            console.log(this.images);
             this.video = this.Data.record?.embed?.video;
         }
-
         if(!BSKYUser.cache.has(this.DID))
         {
             this.userData = new BSKYUser(this.DID, this.Handle);
@@ -299,24 +471,37 @@ class BSKYPost
 class BSKYUser
 {
     static cache = new Map();
+    static handleCache = new Map();
 
-    following = -1;
+    following_state = -1;
     onFollowingChanged = new EventTarget();
     onFollowChange = new CustomEvent("onFollowChange");
     did = null;
     handle = null;
 
+    get following()
+    {
+        if(this.did == myDID) {
+            this.following_state = 0;
+            return 1; }
+        return this.following_state;
+    }
+
     constructor(srcDID, srcHandle)
     {
         this.did = srcDID;
         this.handle = srcHandle;
+        if(!BSKYUser.handleCache.has(srcDID))
+        {
+            BSKYUser.handleCache.set(srcDID, srcHandle);
+        }
     }
 
     setFollowing(followState)
     {
-        if(followState != this.following)
+        if(followState != this.following_state)
         {
-            this.following = followState;
+            this.following_state = followState;
             this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged", {detail:{isFollowing: this.following} } ));
         }
     }
@@ -326,12 +511,18 @@ class BSKYUser
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
 
+    static getHandleFromDID(did)
+    {
+        return BSKYUser.handleCache.get(did);
+    }
+
     static async updateNewAddsFollowState(newUserCache)
     {
         const addCnt = newUserCache.size;
-        if(addCnt > 0)
+        if(addCnt > 0 && newUserCache)
         {
-            const dids = newUserCache.keys().toArray();
+            const keyz = newUserCache.keys();
+            const dids = Array.from(keyz);
             for(let k = 0; k < addCnt; k+=30)
             {
                 const end = k + Math.min(30, addCnt - k);
@@ -353,23 +544,37 @@ class BSKYUser
 
 /*** PROCESSING ***/
 
-
+//beccanical.bsky.social/3lkhxtd3vr22f
 async function processFeedItem(feedItem)
 {
-    let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"],div[role="link"][data-testid^="postThreadItem-"],div[data-testid^="postThreadItem-"]:has(div[role="link"] > a)', argsChildAndSub);
+    let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"],div[role="link"][data-testid^="postThreadItem-"],div[data-testid^="postThreadItem-"]:has(div[role="link"])', argsChildAndSub);
     if(feedPost == null || hasPostProcessed(feedPost)) { return; }
     var url = "";
+
     if(feedPost.hasAttribute("role") && feedPost.role == "link")
     {
-        let link = await awaitElem(feedPost, 'a[role="link"][href^="/profile/"][href*="/post/"]', argsChildAndSub);
+        console.log("finding link");
+            console.log(feedPost);
+        let link = await awaitElem(feedPost, 'a[role="link"][href*="/profile/"][href*="/post/"]', argsChildAndSub);
+        console.log("found link");
+        console.log(link);
         url = link.href;
     }
-    else { url = window.location.href; }
-
-    let cacheKey = url.split('profile/').slice(-1)[0].replace('/post/','/');
-
+    else { url = unsafeWindow.location.href; }
+    console.log("process feed item");
+console.log(url);
+    let urlParts = url.split('profile/').at(-1).split('/post/');
+    let handle = urlParts[0];
+    let postID = urlParts[1];
+    if(handle.startsWith('did:'))
+    {
+        handle = BSKYUser.getHandleFromDID(handle);
+    }
+    let cacheKey = handle + '/' + postID;
+   console.log(cacheKey);
     let cachedPost = BSKYPost.cache.get(cacheKey);
 
+    console.log(cachedPost);
     if(cachedPost)
     {
         cachedPost.link = url;
@@ -407,7 +612,9 @@ async function onNewPageLoaded()
 
     awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileListScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, 'div[style*="display: flex"] [data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="postThread"])', argsChildAndSub).then(setupFeedWatch);
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileFeedScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="feedItem-"])', argsChildAndSub).then(setupFeedWatch);
 }
 
 async function tryProcessFeedData(response)
@@ -482,6 +689,12 @@ async function getRelationships(others)
     return null;
 }
 
+// Thanks to `https://github.com/FerroEduardo/bskyx` for this nifty little API call info
+function getSourceURL(authorDid, videoCid) {
+  const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
+  return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
+}
+
 function formatFilenameDate(date)
 {
     date = date.replace(' at',',');
@@ -489,16 +702,11 @@ function formatFilenameDate(date)
     return isoDate.toISOString("YYYY-MM-DD").split('T')[0];
 }
 
-// Thanks to `https://github.com/FerroEduardo/bskyx` for this nifty little API call info
-function getVideoUrl(authorDid, videoCid) {
-  const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
-  return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
-}
-
 /*
 function getFollows(username, did)
 {
-    fetch(`https://bsky.social/xrpc/app.bsky.graph.getFollows?actor=${did}&limit=100`,
+//TODO: Has a limit of 100, need to find follow count and loop over this to get the full list
+    fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows?actor=${did}&limit=100`,
          {
         "headers": {
             "accept": '*//*',
@@ -513,6 +721,274 @@ function getFollows(username, did)
         "mode": "cors"
     });
 }*/
+
+
+//<--> RIGHT-CLICK CONTEXT MENU STUFF START <-->//
+var ctxMenu;
+var ctxMenuList;
+var ctxMenuOpenInNewTab;
+var ctxMenuOpenVidInNewTab;
+var ctxMenuSaveAs;
+var ctxMenuSaveAsVid;
+var ctxMenuCopyImg;
+var ctxMenuCopyAddress;
+var ctxMenuCopyVidAddress;
+var ctxMenuGRIS;
+var ctxMenuShowDefault;
+
+function initializeCtxMenu()
+{
+    ctxMenu = document.createElement('div');
+    ctxMenu.style.zIndex = "500";
+    ctxMenu.id = "contextMenu";
+    ctxMenu.className = "context-menu";
+    ctxMenuList = document.createElement('ul');
+    //ctxMenuList.style.zIndex = 500;
+    ctxMenu.appendChild(ctxMenuList);
+
+    ctxMenuOpenInNewTab = createCtxMenuItem(ctxMenuList, "Open Image in New Tab");
+    ctxMenuOpenVidInNewTab = createCtxMenuItem(ctxMenuList, "Open Video in New Tab");
+    if(is_chrome)
+    {
+        let hideElem = document.createElement('div');
+        ctxMenuOpenVidInNewTab.style.display = "none";
+        hideElem.appendChild(ctxMenuOpenVidInNewTab);
+        ctxMenuOpenVidInNewTab = hideElem;
+    }
+    ctxMenuSaveAs = createCtxMenuItem(ctxMenuList, "Save Image As");
+    ctxMenuSaveAsVid = createCtxMenuItem(ctxMenuList, "Save Video As");
+    ctxMenuCopyImg = createCtxMenuItem(ctxMenuList, "Copy Image");
+    ctxMenuCopyAddress = createCtxMenuItem(ctxMenuList, "Copy Image Link");
+    ctxMenuCopyVidAddress = createCtxMenuItem(ctxMenuList, "Copy Video Link");
+    ctxMenuGRIS = createCtxMenuItem(ctxMenuList, "Search Google for Image");
+    ctxMenuShowDefault = createCtxMenuItem(ctxMenuList, "Show Default Context Menu");
+
+    document.body.appendChild(ctxMenu);
+    document.body.addEventListener('click', function (e) { setContextMenuVisible(false); });
+
+    setContextMenuVisible(false);
+
+    window.addEventListener('locationchange', function () {
+        setContextMenuVisible(false);
+    });
+    window.addEventListener('popstate',() => {
+        setContextMenuVisible(false);
+    });
+}
+
+function createCtxMenuItem(menuList, text)
+{
+    let menuItem = document.createElement('LI');
+    menuItem.innerText = text;
+    menuList.appendChild(menuItem);
+    return menuItem;
+}
+
+function mouseX(evt)
+{
+    if (evt.pageX)
+    {
+        return evt.pageX;
+    }
+    else if (evt.clientX)
+    {
+        return evt.clientX + (document.documentElement.scrollLeft ?
+            document.documentElement.scrollLeft :
+            document.body.scrollLeft);
+    }
+    else
+    {
+        return null;
+    }
+}
+
+function mouseY(evt)
+{
+    if (evt.pageY)
+    {
+        return evt.pageY;
+    }
+    else if (evt.clientY)
+    {
+        return evt.clientY + (document.documentElement.scrollTop ?
+            document.documentElement.scrollTop :
+            document.body.scrollTop);
+    }
+    else
+    {
+        return null;
+    }
+}
+
+function setContextMenuVisible(visible)
+{
+    ctxMenu.style.display = visible ? "block" : "none";
+}
+
+var selectedShowDefaultContext = false;
+//To avoid the value being captured when setting up the event listeners.
+function wasShowDefaultContextClicked()
+{
+    return selectedShowDefaultContext;
+}
+
+class SelectionCtx
+{
+    constructor(postData, targetElem, isImage, isVideo, vidElem = null)
+    {
+        this.postData = postData;
+        this.targetElem = targetElem;
+        this.isImage = isImage;
+        this.isVideo = isVideo;
+        this.vidElem = vidElem;
+    }
+
+    get VideoSource()
+    {
+        return this.postData.VideoSource;
+    }
+
+    get ImageData()
+    {
+        return this.postData.getImageDataFromURL(this.targetElem.src);
+    }
+}
+
+async function updateContextMenuLink(selContext)
+{
+    if(selContext == null) { return; }
+
+    ctxMenu.setAttribute('selection', selContext);
+
+    let isImage = selContext.isImage;
+
+    let imgVisibility = isImage ? "block" : "none";
+    let vidVisibility = !isImage ? "block" : "none";
+
+    ctxMenuOpenInNewTab.style.display = imgVisibility;
+    ctxMenuSaveAs.style.display = imgVisibility;
+    ctxMenuCopyImg.style.display = imgVisibility;
+    ctxMenuCopyAddress.style.display = imgVisibility;
+    ctxMenuGRIS.style.display = imgVisibility;
+
+    ctxMenuOpenVidInNewTab.style.display = vidVisibility;
+    ctxMenuSaveAsVid.style.display = vidVisibility;
+    ctxMenuCopyVidAddress.style.display = vidVisibility;
+
+    const copyAddress = function(url){ setContextMenuVisible(false); navigator.clipboard.writeText(url); };
+    const openInNewTab = function(url)
+    {
+        setContextMenuVisible(false);
+        if (GM_OpenInTabMissing)
+        {
+            let lastWin = unsafeWindow;
+            unsafeWindow.open(url, '_blank');
+            lastWin.focus();
+        }
+        else { GM_openInTab(url, { active: false, insert: true, setParent: true, incognito: false }); }
+    };
+
+
+    //Image Context
+    if(isImage == true)
+    {
+        ctxMenuOpenInNewTab.onclick = () => {
+            openInNewTab(selContext.ImageData.urlSRC); };
+        ctxMenuSaveAs.onclick = () => {
+            setContextMenuVisible(false);
+            selContext.postData.downloadImageClicked(selContext.targetElem.src);
+        };
+
+        ctxMenuCopyImg.onclick = async () =>
+        {
+            setContextMenuVisible(false);
+            try
+            {
+                GM.xmlHttpRequest({
+                    method: 'GET',
+                    url: selContext.ImageData.urlSRC,
+                    responseType: 'blob',
+                    onload: ({ status, response }) => {
+                        if (status !== 200) return void alert(`Error loading: ${url}`);
+                        let imgBlob = unsafeWindow.URL.createObjectURL(response);
+
+                        let c = document.createElement('canvas');
+                        var img = new Image();
+                        var ctx = c.getContext('2d');
+                        img.onload = async function()
+                        {
+                            c.width = img.width;
+                            c.height = img.height;
+                            ctx.drawImage(img, 0, 0);
+                            c.toBlob((png) =>
+                                     {
+                                navigator.clipboard.write([new ClipboardItem({
+                                    [png.type]: png })]);
+                            }, "image/png", 1);
+                        };
+                        img.src = imgBlob;
+                    },
+                });
+            }
+            catch (err) { console.log(err); };
+        };
+        ctxMenuCopyAddress.onclick = (e) => { copyAddress(selContext.ImageData.urlSRC); };
+        ctxMenuGRIS.onclick = () => {
+            setContextMenuVisible(false);
+            unsafeWindow.open("https://www.google.com/searchbyimage?sbisrc=cr_1_5_2&image_url=" + selContext.ImageData.url);
+        };
+    }
+    else //Video
+    {
+        ctxMenuOpenVidInNewTab.onclick = () => { openInNewTab(selContext.VideoSource); };
+        if(!selContext.targetElem.hasAttribute("downloading"))
+        {
+            ctxMenuSaveAsVid.onclick = async () =>
+            {
+                selContext.targetElem.setAttribute("downloading","");
+                setContextMenuVisible(false);
+                await selContext.postData.downloadVideoButtonClicked();
+                selContext.targetElem.removeAttribute("downloading");
+            };
+        } else { ctxMenuSaveAsVid.style.display = "none"; }
+
+        ctxMenuCopyVidAddress.onclick = () => { copyAddress(selContext.postData.VideoSource) };
+    }
+
+    //Generic Stuff
+    ctxMenuShowDefault.onclick = () => { selectedShowDefaultContext = true;
+        setContextMenuVisible(false); };
+}
+
+function addCustomCtxMenu(selContext)
+{
+    if (addHasAttribute(selContext.targetElem, "bskyEN_customctx")) { return; }
+
+    selContext.targetElem.addEventListener('contextmenu', function (e)
+    {
+        e.stopPropagation();
+
+        let curSel = ctxMenu.getAttribute('selection');
+
+        if (wasShowDefaultContextClicked())
+        { //Skip everything here and show default context menu
+            selectedShowDefaultContext = false;
+            return;
+        }
+
+        e.preventDefault();
+
+        if(ctxMenu.style.display != "block" || (curSel == null || (curSel != null && curSel != selContext)))
+        {
+            updateContextMenuLink(selContext);
+            setContextMenuVisible(true);
+            ctxMenu.style.left = -12.0 + mouseX(e) + "px";
+            ctxMenu.style.top = -10.0 + mouseY(e) + "px";
+        }
+        else { setContextMenuVisible(false); }
+
+    }, {capture: true}, true);
+}
 
 
 /*** OVERRIDES ***/
@@ -648,6 +1124,9 @@ unsafeWindow.addEventListener('locationchange', function () {
 (async function()
  {
     console.log("start userscript");
+    initializeCtxMenu();
+
     let root = await awaitElem(document, 'body #root', argsChildAndSub);
     onNewPageLoaded();
+
 })();
