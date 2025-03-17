@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.24
+// @version      0.25
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -18,7 +18,32 @@
 
 'use strict';
 
-const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
+var bear = "";
+
+//Text content
+const style_hideTextContent = `div[data-testid^="feedItem"] div[data-testid^="contentHider"] > div:not(:has(img,video)) { display: none; }`;
+
+//Bottom row bottons
+const style_hideBottomRowButtons = `div[data-testid^="feedItem"] div:has(> div[data-testid^="contentHider"]) > div:has([data-testid="likeBtn"]) { display: none; }`;
+
+//Post Link
+const style_hidePostLink = `div[data-testid^="feedItem"] div:has(> div[data-testid^="contentHider"]) > div:has(div[dir="auto"] > a[href^="/profile/"]) { display: none; }`;
+
+//Show only image posts
+const styleFilter_onlyImagePosts = `div[data-testid^="feedItem"]:not(:has(div[data-testid^="contentHider"] img)) { display: none; }`;
+
+//Show only posts by same user
+const styleFilter_onlySameUserPosts = `div[data-testid^="feedItem"]:not(:has(div[dir="auto"] > a[href^="/profile/snailerpark"])) { display: none; }`;
+
+//Post top padding
+const style_postTopPadding = `div[data-testid^="feedItem"] > div > [style*="flex-direction: row"] { display: none; }`;
+
+//Left Avatar Panel
+const style_LeftAvatarPanel = `div[data-testid^="feedItem"] div:has(> div > div[data-testid^="contentHider"]) > div:has(a[href^="/profile/"] img[src*="avatar"]) { display: none; }`;
+
+//Remove padding
+const style_RemovePadding = `div[data-testid^="feedItem"] > div { padding: 0px !important; }
+div[data-testid^="feedItem"] div:has(> div[data-testid^="contentHider"]) div[style*="margin-top"] { margin-top: 0px !important; }`;
 
 addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
@@ -48,176 +73,337 @@ addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     {
         fill: rgba(255, 50, 40, 0.05);
     }
+}
+div.bskyIVX_followIcon {
+    position: fixed;
+    width: 1em;
+    height: 1em;
+    size: 10px;
+    align-self: auto;
+    margin-left: -0.6em;
+    margin-top: 1.8em;
 }`);
 
 const linkSVG = `<svg class="vxLinkSVG vxDlSVG" xmlns="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" version="1.1" id="Layer_1" x="0px" y="0px" width="24" height="24" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve" data-google-analytics-opt-out="">
 <path fill="white" d="M459.654,233.373l-90.531,90.5c-49.969,50-131.031,50-181,0c-7.875-7.844-14.031-16.688-19.438-25.813  l42.063-42.063c2-2.016,4.469-3.172,6.828-4.531c2.906,9.938,7.984,19.344,15.797,27.156c24.953,24.969,65.563,24.938,90.5,0  l90.5-90.5c24.969-24.969,24.969-65.563,0-90.516c-24.938-24.953-65.531-24.953-90.5,0l-32.188,32.219  c-26.109-10.172-54.25-12.906-81.641-8.891l68.578-68.578c50-49.984,131.031-49.984,181.031,0  C509.623,102.342,509.623,183.389,459.654,233.373z M220.326,382.186l-32.203,32.219c-24.953,24.938-65.563,24.938-90.516,0  c-24.953-24.969-24.953-65.563,0-90.531l90.516-90.5c24.969-24.969,65.547-24.969,90.5,0c7.797,7.797,12.875,17.203,15.813,27.125  c2.375-1.375,4.813-2.5,6.813-4.5l42.063-42.047c-5.375-9.156-11.563-17.969-19.438-25.828c-49.969-49.984-131.031-49.984-181.016,0  l-90.5,90.5c-49.984,50-49.984,131.031,0,181.031c49.984,49.969,131.031,49.969,181.016,0l68.594-68.594  C274.561,395.092,246.42,392.342,220.326,382.186z"/>
 </svg>`;
 
-function doOnAttributeChange2(elem, onChange, repeatOnce = false)
-{
-    let rootObserver = new MutationObserver((mutes, obvs) => {
-        obvs.disconnect();
-        onChange(elem);
-        if (repeatOnce == true) { return; }
-        obvs.observe(elem, { childList: false, subtree: false, attributes: true })
-    });
-    rootObserver.observe(elem, { childList: false, subtree: false, attributes: true });
-}
+const followSVG = `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="25" height="25" viewBox="0 0 24 24">
+<path d="M12 3A9 9 0 1 0 12 21A9 9 0 1 0 12 3Z" fill="rgb(100, 180, 255)"></path><path d="M12,22C6.5,22,2,17.5,2,12C2,6.5,6.5,2,12,2c5.5,0,10,4.5,10,10C22,17.5,17.5,22,12,22z M12,4c-4.4,0-8,3.6-8,8 c0,4.4,3.6,8,8,8c4.4,0,8-3.6,8-8C20,7.6,16.4,4,12,4z" fill="#dee82acc" class="bskyEN_follow_outline"></path><path d="M11 7H13V17H11z"></path><path d="M7 11H17V13H7z"></path>
+</svg>`;
 
-function vidForceHQ(vidElem)
+const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
+
+/*** CLASSES ***/
+class BSKYPost
 {
-    if (is_chrome == false)
+    static cache = new Map();
+
+    video = null;
+    images = null;
+
+    get URI() { return this.Data.uri; }
+    get CID() { return this.Data.cid; }
+    get DID() { return this.Data.author.did; }
+    get Handle() { return this.Data.author; }
+
+    get Tags(){
+        return this.Data?.record?.tags ?? [];
+    }
+
+    get AuthorData() {
+        return this.Data.author;
+    }
+
+    get VideoSource() {
+       return getVideoUrl(this.Data.author.did, this.video.ref.$link);
+    }
+
+    get PostDate()
     {
-        let linksplit = vidElem.poster.split('/');
-        for(let i = 1; i < linksplit.length; i++)
-        {
-            let linkpart = linksplit[i];
-            if(linkpart.includes('did%3Aplc'))
-            {
-                let did = linkpart;
-                let cid = linksplit[i + 1];
-                vidElem.preload = "auto";
-                let hqURL = getVideoUrl(did,cid);
-                vidElem.src = hqURL;
+        return formatFilenameDate(this.Data.record.createdAt);
+    }
 
-                break;
+    get VideoIsDownloading() { return this.videoDLButton.hasAttribute('downloading'); }
+
+    /*** EVENTS ***/
+    onFollowingChanged = new EventTarget();
+
+    listenForFollowChange(callbackMethod)
+    {
+        this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
+    }
+
+    downloadVideoButtonClicked()
+    {
+        if(this.VideoIsDownloading) { return; }
+        this.setDownloadingState(true)
+        let filename = `${this.AuthorData.handle}_${this.PostDate}_${this.postID}.mp4`;
+        download(this.VideoSource, filename).then(() => { this.setDownloadingState(false); }).catch(() => { this.setDownloadingState(false); }, 120000);
+    }
+
+    /*** UTILITY ***/
+    static TryCreateNew(postData)
+    {
+        if(postData?.post?.author == null) { return null; }
+        let post = postData.post;
+
+        let postID = post.uri.split('feed.post/').slice(-1)[0];
+        let keyName = `${post.author.handle}/${postID}`;
+        if(BSKYPost.cache.has(keyName)) { return; }
+        let newPost = new BSKYPost(post, postID);
+        BSKYPost.cache.set(keyName, newPost);
+    }
+
+    setDownloadingState(downloading)
+    {
+        if(downloading == true) { this.videoDLButton.setAttribute('downloading', ''); }
+        else if(this.videoDLButton.hasAttribute('downloading')) { this.videoDLButton.removeAttribute('downloading'); }
+    }
+
+    copyPostLink()
+    {
+        if(this.copyBtn.hasAttribute('clicked')) { return; }
+        if(this.link)
+        {
+            this.copyBtn.setAttribute('clicked', '');
+            let link = this.link;
+
+            if(link.startsWith('https://bsky.app/'))
+            {
+                link = link.replace('https://bsky.app/','https://bskyx.app/');
             }
+            navigator.clipboard.writeText(link);
+            window.setTimeout(()=>{
+                if(this.copyBtn.hasAttribute('clicked'))
+                {
+                    this.copyBtn.removeAttribute('clicked');
+                }
+            }, 2000);
         }
     }
-    let postitem = vidElem.closest('div[data-testid^="feedItem-"],div[data-testid^="postThreadItem-"]');
-    processPostItem(postitem);
-}
 
-function onNodesAdded(nodes)
-{
-    if (nodes.length == 0) { return; }
-    for(let i = 0; i < nodes.length; i++)
+    /*** SETUP ***/
+    static async enforceHighQualityVideo(post, postData)
     {
-        let child = nodes[i];
-        if(child != null)
+        let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"],video[src*=".webm"],video[src*=".mp4"],video', argsChildAndSub);
+        if(vid == null) { return; }
+        vid.src = postData.VideoSource;
+    }
+
+    setupVideoDownloadButton()
+    {
+        this.videoDLButton = createDLButton();
+        this.videoDLButton.onclick = (e) => {
+            e.stopPropagation();
+            this.downloadVideoButtonClicked();
+        };
+        this.buttonBar.appendChild(this.videoDLButton);
+
+        if (is_chrome == true) { return; }
+        BSKYPost.enforceHighQualityVideo(this.postElem, this);
+    }
+
+
+    async processPostElement(post)
+    {
+        this.postElem = post;
+        var iconElem = this.postElem.querySelector('a[href^="/profile/"]:has(div[data-testid="userAvatarImage"])');
+        var followIcon = document.createElement('div');
+        followIcon.className = "bskyIVX_followIcon";
+        followIcon.innerHTML = followSVG;
+        iconElem.appendChild(followIcon);
+        this.followIcon = followIcon;
+        this.followIcon.style.display = "none";
+
+        if(this.userData.following == 0)
         {
-            let vid = child?.querySelector('video');
-            if(vid)
+            this.followIcon.style.display = "block";
+        }
+
+        this.userData.listenForFollowChange((followStatus) =>{
+            this.followIcon.style.display = followStatus.detail.isFollowing == 1 ? "none" : "block";
+        });
+
+        this.buttonBar = await awaitElem(this.postElem, 'div:has(> div > [data-testid="likeBtn"])', argsChildAndSub);
+
+        this.copyBtn = document.createElement("button");
+        this.copyBtn.className = "bskyhd-copy-link";
+        this.copyBtn.innerHTML = linkSVG;
+        this.copyBtn.title = "Copy Video Embed Compatible Link";
+        this.copyBtn.onclick = (e)=>
+        {
+            e.stopPropagation();
+            this.copyPostLink();
+        };
+
+        this.buttonBar.appendChild(this.copyBtn);
+
+        if(this.video) { this.setupVideoDownloadButton(); }
+    }
+
+    constructor(postData, postID)
+    {
+        this.Data = postData;
+        this.postID = postID;
+        this.embed = this.Data?.embed;
+        this.hasMedia = this.embed != null;
+        this.video = null;
+        this.images = null;
+
+        if(this.hasMedia)
+        {
+            if(this.embed.$type.includes('.recordWithMedia'))
             {
-                processVidElem(vid);
+                this.quote = this.embed.record;
+                this.embed = this.embed.media;
             }
+            this.images = this.embed?.images ?? [];
+            this.video = this.Data.record?.embed?.video;
+        }
+
+        if(!BSKYUser.cache.has(this.DID))
+        {
+            this.userData = new BSKYUser(this.DID, this.Handle);
+            BSKYUser.cache.set(this.DID, this.userData);
+        }
+        else
+        {
+            this.userData = BSKYUser.cache.get(this.DID);
         }
     }
 }
 
-function processVidElem(vid)
+
+class BSKYUser
 {
-    if(addHasAttribute(vid, "bskyHD")) { return; }
-    vidForceHQ(vid);
-    doOnAttributeChange2(vid, vidForceHQ);
-}
+    static cache = new Map();
 
-async function processPostItem(post)
-{
-    if(!post || addHasAttribute(post, "bskyEN")) { return; }
-    let vid = await awaitElem(post, 'figure > video[poster^="https://video.bsky"],video[src*=".webm"],video[src*=".mp4"]', argsChildAndSub);
-    if(vid == null) { return; }
+    following = -1;
+    onFollowingChanged = new EventTarget();
+    did = null;
+    handle = null;
 
-    let buttonBar = await awaitElem(post, 'div:has(> div > [data-testid="likeBtn"])', argsChildAndSub);
-
-    let copyBtn = document.createElement("button");
-    copyBtn.className = "bskyhd-copy-link";
-    copyBtn.innerHTML = linkSVG;
-    copyBtn.title = "Copy Video Embed Compatible Link";
-    copyBtn.onclick = (e)=>
+    constructor(srcDID, srcHandle)
     {
-        e.stopPropagation();
-        copyPostLink(post, copyBtn);
-    };
-    buttonBar.appendChild(copyBtn);
+        this.did = srcDID;
+        this.handle = srcHandle;
+        this.onFollowChange = new CustomEvent("onFollowChange");
+        isFollowingUser(srcDID).then((result)=>{
+           this.setFollowing(result ? 1 : 0);
+        });
+    }
 
-
-    let dlBtn = createDLButton();
-    dlBtn.onclick = (e) => {
-        e.stopPropagation();
-        if(dlBtn.hasAttribute('downloading')) { return; }
-        dlBtn.setAttribute('downloading', '');
-        downloadPostVid(post, vid, dlBtn);
-    };
-    buttonBar.appendChild(dlBtn);
-}
-
-
-function findPostLink(post)
-{
-	let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
-    if(postInfo) { return postInfo.href; }
-
-    return window.location.href.includes('/profile/') ? window.location.href : null;
-}
-
-function copyPostLink(post, linkBtn)
-{
-    if(linkBtn.hasAttribute('clicked')) { return; }
-    let link = findPostLink(post);
-    if(link)
+    setFollowing(followState)
     {
-        linkBtn.setAttribute('clicked', '');
-        if(link.startsWith('https://bsky.app/'))
+        if(followState != this.following)
         {
-            link = link.replace('https://bsky.app/','https://bskye.app/');
+            this.following = followState;
+            this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged",{ detail:{isFollowing: this.following}}));
         }
-        navigator.clipboard.writeText(link);
-        window.setTimeout(()=>{
-            if(linkBtn.hasAttribute('clicked'))
-            {
-             linkBtn.removeAttribute('clicked');
-            }
-        }, 2000);
+    }
+
+    listenForFollowChange(callbackMethod)
+    {
+        this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
 }
 
-function downloadPostVid(post, vidElem, dlBtn)
+/*** PROCESSING ***/
+async function processFeedItem(feedItem)
 {
-    let saveData = getSaveDataFromPost(post);
-    let vidUrl = vidElem.src;
+    let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"]', argsChildAndSub);
+    if(feedPost == null || hasPostProcessed(feedPost)) { return; }
 
-    if(vidElem?.poster && vidElem.poster.includes('did%3Aplc'))
+    let link = await awaitElem(feedPost, 'a[role="link"][href^="/profile/"][href*="/post/"]', argsChildAndSub);
+    let cacheKey = link.href.split('profile/').slice(-1)[0].replace('/post/','/');
+
+    let cachedPost = BSKYPost.cache.get(cacheKey);
+
+    if(cachedPost && cachedPost.hasMedia)
     {
-        let posterParts = vidElem.poster.split('/watch/')[1].split('/');
-        let did = posterParts[0].replace('%3A',':');
-        let cid = posterParts[1];
-        vidUrl = getVideoUrl(did, cid);
+        cachedPost.link = link.href;
+        cachedPost.processPostElement(feedPost);
     }
-
-    let filename = `${saveData.username}_${saveData.date}_${saveData.postID}.mp4`;
-    download(vidUrl, filename).then(() => { console.log("done"); removeButtonEffect(dlBtn); }).catch(() => { removeButtonEffect(dlBtn); }, 20000);
 }
 
-function getSaveDataFromPost(post)
+function onFeedItemsAdded(addItems)
 {
-    let link = "";
-    let date = "";
-    let username = "";
-    let postID = "";
+    if (addItems.length == 0) { return; }
+    addItems.forEach(processFeedItem);
+}
 
-    let postInfo = post.querySelector('a[href*="/post/"][role="link"]');
-    if(postInfo)
+function setupFeedWatch(feedElem)
+{
+    if(!hasCustomListener(feedElem))
     {
-        link = postInfo.href;
-        date = formatFilenameDate(postInfo.getAttribute('data-tooltip'));
+        onFeedItemsAdded(feedElem.childNodes);
+        watchForAddedNodes(feedElem, false, { attributes: false, childList: true }, onFeedItemsAdded);
     }
-    else
-    {
-        date = post.querySelector('div:has(> button[aria-label*="who can reply" i]) > div')?.innerText;
-        date = formatFilenameDate(date);
-        link = window.location.href.includes('/profile/') ? window.location.href : null;
-    }
-    if(link != null)
-    {
-        let splitLink = link.split('/profile/')[1].split('/post/');
-        username = splitLink[0];
-        postID = splitLink[1];
-        if(!username.endsWith('bsky.social')) { username += '_(BSKY)'; }
-    }
+}
 
-    return {username: username, date: date, postID: postID };
+async function setupScreenWatch(screenElem)
+{
+    if(hasCustomListener(screenElem)){ return; }
+
+    let flatlist = await awaitElem(screenElem, '[data-testid$="eed-flatlist"] > div[style*="removed-body-scroll"] > div', argsChildAndSub);
+    let feeds = screenElem.querySelectorAll('[data-testid$="eed-flatlist"] > div[style*="removed-body-scroll"] > div');
+    feeds.forEach(setupFeedWatch);
+}
+
+async function onNewPageLoaded()
+{
+    let root = await awaitElem(document, 'body #root', argsChildAndSub);
+    awaitElem(root, '[data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
+    awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
+    awaitElem(root, '[data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div', argsChildAndSub).then(setupFeedWatch);
+}
+
+async function tryProcessFeedData(response)
+{
+    let json = await response.json();
+    if(json != null && json?.feed != null)
+    {
+        json.feed.forEach(BSKYPost.TryCreateNew);
+    }
+}
+
+/*** UTILITIES ***/
+function getDid(username) { return fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=invertex.xyz?did=did:plc:ewm2epvgjd5prkys3w3oh37k`); }
+
+function hasCustomListener(elem) { return addHasAttribute(elem, "bskyENListener"); }
+
+function hasPostProcessed(post) { return addHasAttribute(post, "bskyENPost"); }
+
+async function isFollowingUser(did)
+{
+    try {
+        let resp = await fetch(`https://bsky.social/xrpc/app.bsky.actor.getProfile?actor=${did}`, {
+            "headers": {
+                "accept": "*/*",
+                "accept-language": "en-US,en;q=0.9",
+                "authorization": bear,
+                "pragma": "no-cache",
+                "priority": "u=1, i",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "cross-site"
+            },
+            "referrer": "https://bsky.app/",
+            "referrerPolicy": "origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors"
+        });
+
+        if(!resp.ok) { return false; }
+
+        const data = await resp.json();
+        if(data?.viewer?.following != null) { return true; }
+
+    } catch(e) { return false; }
+
+    return false;
 }
 
 function formatFilenameDate(date)
@@ -227,16 +413,66 @@ function formatFilenameDate(date)
     return isoDate.toISOString("YYYY-MM-DD").split('T')[0];
 }
 
-// Thanks to `https://github.com/FerroEduardo/bskye` for this nifty little API call info
+// Thanks to `https://github.com/FerroEduardo/bskyx` for this nifty little API call info
 function getVideoUrl(authorDid, videoCid) {
   const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
   return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
 }
 
-function removeButtonEffect(dlBtn)
+/*
+function getFollows(username, did)
 {
-    if(dlBtn?.hasAttribute('downloading')) { dlBtn.removeAttribute('downloading'); }
+    fetch(`https://bsky.social/xrpc/app.bsky.graph.getFollows?actor=${did}&limit=100`,
+         {
+        "headers": {
+            "accept": '*//*',
+            "accept-encoding":"gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9",
+            "authorization": bear,
+        },
+        "body": null,
+        "origin":"https://bsky.app",
+        "referer":"https://bsky.app/",
+        "method": "GET",
+        "mode": "cors"
+    });
+}*/
+
+
+/*** OVERRIDES ***/
+const { fetch: originalFetch } = unsafeWindow;
+
+async function checkCreateRecordForFollow(record)
+{
+    if(record && record?.record && record.record.$type?.includes('graph.follow'))
+    {
+        let did = record.record.subject;
+        let cachedUser = BSKYUser.cache.get(did);
+        if(cachedUser) { cachedUser.setFollowing(1); }
+    }
 }
+
+unsafeWindow.fetch = exportFunction(async (...args) => {
+    let [resource, config] = args;
+
+    if(config && config?.headers != null && config?.headers?.get("authorization"))
+    {
+        bear = config.headers.get("authorization");
+    }
+    if(resource?.url?.includes('repo.createRecord'))
+    {
+        resource.clone().json().then(checkCreateRecordForFollow);
+    }
+    const response = await originalFetch(resource, config);
+    if(resource?.url)
+    {
+        if(resource.url.includes('bsky.feed.'))
+        {
+            tryProcessFeedData(response.clone());
+        }
+    }
+    return response;
+}, unsafeWindow);
 
 const filterVideoSources = function (m3u8)
 {
@@ -296,18 +532,10 @@ function processXMLOpen(thisRef, method, url)
 }
 
 
-//Intercept video playlist response so we can modify it
-var openOpen = unsafeWindow.XMLHttpRequest.prototype.open;
-unsafeWindow.XMLHttpRequest.prototype.open = exportFunction(function(method, url)
-{
-    processXMLOpen(this, method, url);
-    openOpen.call(this, method, url);
-}, unsafeWindow);
-
-(async function() {
-
+/*** ENTRY ***/
+(async function()
+ {
+    console.log("start userscript");
     let root = await awaitElem(document, 'body #root', argsChildAndSub);
-    let vids = root.querySelectorAll('div[data-testid^="feedItem-"] video,div[data-testid^="postThreadItem-"] video');
-    vids.forEach(processVidElem);
-    watchForAddedNodes(root, false, { attributes: false, childList: true, subtree: true }, onNodesAdded);
+    onNewPageLoaded();
 })();
