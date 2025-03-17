@@ -436,7 +436,16 @@ async function tryProcessFeedData(response)
 }
 
 /*** UTILITIES ***/
-function getDid(username) { return fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=invertex.xyz?did=did:plc:ewm2epvgjd5prkys3w3oh37k`); }
+async function getUserDID(username) {
+    let resp = fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${username}`);
+    if(resp && resp.ok)
+    {
+        let data = await resp.json();
+        return data.did;
+    }
+
+    return null;
+}
 
 function hasCustomListener(elem) { return addHasAttribute(elem, "bskyENListener"); }
 
