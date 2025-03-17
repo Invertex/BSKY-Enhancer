@@ -353,8 +353,9 @@ async function setupScreenWatch(screenElem)
 
 async function onNewPageLoaded()
 {
-    let root = await awaitElem(document, 'body #root', argsChildAndSub);
-    awaitElem(root, '[data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
+    let root = await awaitElem(document, 'body #root main', argsChildAndSub);
+
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, '[data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div', argsChildAndSub).then(setupFeedWatch);
 }
@@ -531,6 +532,33 @@ function processXMLOpen(thisRef, method, url)
     }
 }
 
+/*** EVENTS ***/
+unsafeWindow.addEventListener('locationchange', function () {
+    console.log("location changed");
+    onNewPageLoaded();
+});
+
+(() => {
+    let oldPushState = history.pushState;
+    history.pushState = function pushState() {
+        let ret = oldPushState.apply(this, arguments);
+        unsafeWindow.dispatchEvent(new Event('pushstate'));
+        unsafeWindow.dispatchEvent(new Event('locationchange'));
+        return ret;
+    };
+
+    let oldReplaceState = history.replaceState;
+    history.replaceState = function replaceState() {
+        let ret = oldReplaceState.apply(this, arguments);
+        unsafeWindow.dispatchEvent(new Event('replacestate'));
+        unsafeWindow.dispatchEvent(new Event('locationchange'));
+        return ret;
+    };
+
+    unsafeWindow.addEventListener('popstate', () => {
+        unsafeWindow.dispatchEvent(new Event('locationchange'));
+    });
+})();
 
 /*** ENTRY ***/
 (async function()
