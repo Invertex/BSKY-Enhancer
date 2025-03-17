@@ -19,7 +19,7 @@
 'use strict';
 
 var bear = "";
-
+var myDID = null;
 //Text content
 const style_hideTextContent = `div[data-testid^="feedItem"] div[data-testid^="contentHider"] > div:not(:has(img,video)) { display: none; }`;
 
@@ -101,6 +101,7 @@ class BSKYPost
 
     video = null;
     images = null;
+    followIcon = null;
 
     get URI() { return this.Data.uri; }
     get CID() { return this.Data.cid; }
@@ -126,6 +127,28 @@ class BSKYPost
 
     get VideoIsDownloading() { return this.videoDLButton.hasAttribute('downloading'); }
 
+    static TryCreateNew(postData, newUserCache)
+    {
+        if(postData?.post?.author == null) { return null; }
+        let post = postData.post;
+
+        let postID = post.uri.split('feed.post/').slice(-1)[0];
+        let keyName = `${post.author.handle}/${postID}`;
+        if(!BSKYPost.cache.has(keyName))
+        {
+            let newPost = new BSKYPost(post, postID, newUserCache);
+            BSKYPost.cache.set(keyName, newPost);
+        }
+        if(post.replyCount > 0 && Object.hasOwn(post,"replies"))
+        {
+            for(let i = 0; i < post.replies.length; i++)
+            {
+                BSKYPost.TryCreateNew(post.replies[i], newUserCache) ;
+            }
+        }
+    }
+
+
     /*** EVENTS ***/
     onFollowingChanged = new EventTarget();
 
@@ -142,19 +165,15 @@ class BSKYPost
         download(this.VideoSource, filename).then(() => { this.setDownloadingState(false); }).catch(() => { this.setDownloadingState(false); }, 120000);
     }
 
-    /*** UTILITY ***/
-    static TryCreateNew(postData)
+    updateFollowIcon(followIcon, followStatus)
     {
-        if(postData?.post?.author == null) { return null; }
-        let post = postData.post;
-
-        let postID = post.uri.split('feed.post/').slice(-1)[0];
-        let keyName = `${post.author.handle}/${postID}`;
-        if(BSKYPost.cache.has(keyName)) { return; }
-        let newPost = new BSKYPost(post, postID);
-        BSKYPost.cache.set(keyName, newPost);
+        if(followIcon != null)
+        {
+            followIcon.style.display = followStatus.detail.isFollowing === 1 ? "none" : "block";
+        }
     }
 
+    /*** UTILITY ***/
     setDownloadingState(downloading)
     {
         if(downloading == true) { this.videoDLButton.setAttribute('downloading', ''); }
@@ -208,6 +227,7 @@ class BSKYPost
     async processPostElement(post)
     {
         this.postElem = post;
+
         var iconElem = this.postElem.querySelector('a[href^="/profile/"]:has(div[data-testid="userAvatarImage"])');
         var followIcon = document.createElement('div');
         followIcon.className = "bskyIVX_followIcon";
@@ -220,29 +240,29 @@ class BSKYPost
         {
             this.followIcon.style.display = "block";
         }
+        this.userData.listenForFollowChange((followUpdate)=>{this.updateFollowIcon(this.followIcon, followUpdate)});
 
-        this.userData.listenForFollowChange((followStatus) =>{
-            this.followIcon.style.display = followStatus.detail.isFollowing == 1 ? "none" : "block";
-        });
+        this.buttonBar = this.postElem.querySelector('div:has(> div > [data-testid="likeBtn"])');
 
-        this.buttonBar = await awaitElem(this.postElem, 'div:has(> div > [data-testid="likeBtn"])', argsChildAndSub);
-
-        this.copyBtn = document.createElement("button");
-        this.copyBtn.className = "bskyhd-copy-link";
-        this.copyBtn.innerHTML = linkSVG;
-        this.copyBtn.title = "Copy Video Embed Compatible Link";
-        this.copyBtn.onclick = (e)=>
+        if(this.hasMedia)
         {
-            e.stopPropagation();
-            this.copyPostLink();
-        };
+            this.copyBtn = document.createElement("button");
+            this.copyBtn.className = "bskyhd-copy-link";
+            this.copyBtn.innerHTML = linkSVG;
+            this.copyBtn.title = "Copy Video Embed Compatible Link";
+            this.copyBtn.onclick = (e)=>
+            {
+                e.stopPropagation();
+                this.copyPostLink();
+            };
 
-        this.buttonBar.appendChild(this.copyBtn);
+            this.buttonBar.appendChild(this.copyBtn);
 
-        if(this.video) { this.setupVideoDownloadButton(); }
+            if(this.video) { this.setupVideoDownloadButton(); }
+        }
     }
 
-    constructor(postData, postID)
+    constructor(postData, postID, newUserCache)
     {
         this.Data = postData;
         this.postID = postID;
@@ -266,6 +286,7 @@ class BSKYPost
         {
             this.userData = new BSKYUser(this.DID, this.Handle);
             BSKYUser.cache.set(this.DID, this.userData);
+            newUserCache.set(this.DID, this.userData);
         }
         else
         {
@@ -281,6 +302,7 @@ class BSKYUser
 
     following = -1;
     onFollowingChanged = new EventTarget();
+    onFollowChange = new CustomEvent("onFollowChange");
     did = null;
     handle = null;
 
@@ -288,10 +310,6 @@ class BSKYUser
     {
         this.did = srcDID;
         this.handle = srcHandle;
-        this.onFollowChange = new CustomEvent("onFollowChange");
-        isFollowingUser(srcDID).then((result)=>{
-           this.setFollowing(result ? 1 : 0);
-        });
     }
 
     setFollowing(followState)
@@ -299,7 +317,7 @@ class BSKYUser
         if(followState != this.following)
         {
             this.following = followState;
-            this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged",{ detail:{isFollowing: this.following}}));
+            this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged", {detail:{isFollowing: this.following} } ));
         }
     }
 
@@ -307,23 +325,55 @@ class BSKYUser
     {
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
+
+    static async updateNewAddsFollowState(newUserCache)
+    {
+        const addCnt = newUserCache.size;
+        if(addCnt > 0)
+        {
+            const dids = newUserCache.keys().toArray();
+            for(let k = 0; k < addCnt; k+=30)
+            {
+                const end = k + Math.min(30, addCnt - k);
+                const subset = dids.slice(k, end);
+                const usersQuery = subset.join('&others=');
+
+                let relationships = await getRelationships(usersQuery);
+                if(relationships)
+                {
+                    relationships.forEach((relationship)=>{
+                        newUserCache.get(relationship.did).setFollowing(relationship?.following ? 1 : 0);
+                    });
+                }
+            }
+        }
+        newUserCache.clear();
+    }
 }
 
 /*** PROCESSING ***/
+
+
 async function processFeedItem(feedItem)
 {
-    let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"]', argsChildAndSub);
+    let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"],div[role="link"][data-testid^="postThreadItem-"],div[data-testid^="postThreadItem-"]:has(div[role="link"] > a)', argsChildAndSub);
     if(feedPost == null || hasPostProcessed(feedPost)) { return; }
+    var url = "";
+    if(feedPost.hasAttribute("role") && feedPost.role == "link")
+    {
+        let link = await awaitElem(feedPost, 'a[role="link"][href^="/profile/"][href*="/post/"]', argsChildAndSub);
+        url = link.href;
+    }
+    else { url = window.location.href; }
 
-    let link = await awaitElem(feedPost, 'a[role="link"][href^="/profile/"][href*="/post/"]', argsChildAndSub);
-    let cacheKey = link.href.split('profile/').slice(-1)[0].replace('/post/','/');
+    let cacheKey = url.split('profile/').slice(-1)[0].replace('/post/','/');
 
     let cachedPost = BSKYPost.cache.get(cacheKey);
 
-    if(cachedPost && cachedPost.hasMedia)
+    if(cachedPost)
     {
-        cachedPost.link = link.href;
-        cachedPost.processPostElement(feedPost);
+        cachedPost.link = url;
+        await cachedPost.processPostElement(feedPost);
     }
 }
 
@@ -357,15 +407,31 @@ async function onNewPageLoaded()
 
     awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
-    awaitElem(root, '[data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div', argsChildAndSub).then(setupFeedWatch);
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="postThread"])', argsChildAndSub).then(setupFeedWatch);
 }
 
 async function tryProcessFeedData(response)
 {
     let json = await response.json();
-    if(json != null && json?.feed != null)
+    if(json == null) { return; }
+
+    let posts = json?.posts ?? json?.feed;
+
+    if(posts != null)
     {
-        json.feed.forEach(BSKYPost.TryCreateNew);
+        // We make a new one each time instead of global in case multiple feed processes happen before the response of relationship data for users comes back, otherwise data will change mid-processing
+        let newUsersCache = new Map();
+        for(let i = 0; i < posts.length; i++)
+        {
+           BSKYPost.TryCreateNew(posts[i], newUsersCache) ;
+        }
+        await BSKYUser.updateNewAddsFollowState(newUsersCache);
+    }
+    else if(json?.thread != null && json.thread?.post)
+    {
+        let newUsersCache = new Map();
+        BSKYPost.TryCreateNew(json.thread, newUsersCache);
+        await BSKYUser.updateNewAddsFollowState(newUsersCache);
     }
 }
 
@@ -376,35 +442,35 @@ function hasCustomListener(elem) { return addHasAttribute(elem, "bskyENListener"
 
 function hasPostProcessed(post) { return addHasAttribute(post, "bskyENPost"); }
 
-async function isFollowingUser(did)
+
+async function getFollowStatus(did)
 {
     try {
-        let resp = await fetch(`https://bsky.social/xrpc/app.bsky.actor.getProfile?actor=${did}`, {
-            "headers": {
-                "accept": "*/*",
-                "accept-language": "en-US,en;q=0.9",
-                "authorization": bear,
-                "pragma": "no-cache",
-                "priority": "u=1, i",
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "cross-site"
-            },
-            "referrer": "https://bsky.app/",
-            "referrerPolicy": "origin-when-cross-origin",
-            "body": null,
-            "method": "GET",
-            "mode": "cors"
-        });
+        let resp = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getRelationships?actor=${myDID}&others=${did}`);
 
         if(!resp.ok) { return false; }
 
         const data = await resp.json();
-        if(data?.viewer?.following != null) { return true; }
+        if(data?.vierelationships?.[0]?.following != null) { return true; }
 
     } catch(e) { return false; }
 
     return false;
+}
+
+async function getRelationships(others)
+{
+    try {
+        let resp = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getRelationships?actor=${myDID}&others=${others}`);
+
+        if(!resp.ok) { return null; }
+
+        const data = await resp.json();
+        return data?.relationships;
+
+    } catch(e) { return null; }
+
+    return null;
 }
 
 function formatFilenameDate(date)
@@ -454,24 +520,34 @@ async function checkCreateRecordForFollow(record)
 }
 
 unsafeWindow.fetch = exportFunction(async (...args) => {
-    let [resource, config] = args;
+    const [resource, config] = args;
 
-    if(config && config?.headers != null && config?.headers?.get("authorization"))
-    {
-        bear = config.headers.get("authorization");
-    }
-    if(resource?.url?.includes('repo.createRecord'))
+    let isGetSession = (resource?.constructor === URL && resource.href.includes('server.getSession'));
+    let isRequest = resource?.constructor === Request;
+
+    if(!isGetSession && isRequest && resource.url.includes('repo.createRecord'))
     {
         resource.clone().json().then(checkCreateRecordForFollow);
     }
-    const response = await originalFetch(resource, config);
-    if(resource?.url)
+    if(isGetSession)
     {
-        if(resource.url.includes('bsky.feed.'))
+        if(config?.headers?.has("authorization"))
         {
-            tryProcessFeedData(response.clone());
+            bear = config?.headers?.get("authorization");
         }
     }
+
+    const response = await originalFetch(resource, config);
+    if(isGetSession)
+    {
+        var sessionData = await response.clone().json();
+        myDID = sessionData?.did;
+    }
+    else if(isRequest && resource.url.includes('bsky.feed.'))
+    {
+        tryProcessFeedData(response.clone());
+    }
+
     return response;
 }, unsafeWindow);
 
@@ -534,7 +610,6 @@ function processXMLOpen(thisRef, method, url)
 
 /*** EVENTS ***/
 unsafeWindow.addEventListener('locationchange', function () {
-    console.log("location changed");
     onNewPageLoaded();
 });
 
