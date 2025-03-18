@@ -9,12 +9,13 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
 - Source-quality video playback. `(Chrome can't, but highest-quality stream will play instantly!)`
 - Download video button below posts.
 - Custom context menu on media for interacting with the source-quality content
-- Saves files with proper attribution e.g: `didplc-ewm2epvgjd5prkys3w3oh37k_(invertex.xyz)_2024-11-22_3lbltee7tz62n_1.jpg`
+- Saves files with proper attribution e.g:
+  - `didplc-ewm2epvgjd5prkys3w3oh37k_(invertex.xyz)_2024-11-22_3lbltee7tz62n_1.jpg`
   - So files are User & Date sorted. Contains Post-ID to find that post on their account again too!
   - And includes user's "DID" so they can be found even if their Handle/Username changes!
-- Adds a "Copy Link" button below media posts to automatically copy it as a `bskyx.app` link, so the video will embed properly when pasted elsewhere.
-- Hidden "tags" show on the post! (third-party apps like deck.blue allow you to make posts with the tags hidden in the data)
-- Plus-Icon shown on avatars if you don't follow the user. (Just like on Mobile).
+- Adds a "Copy Link" button below media posts to automatically copy it as a `bskyx.app` link, so the media will embed properly when pasted elsewhere.
+- Hidden "hashtags" show on the post! (other apps like deck.blue can make posts with the tags hidden in data)
+- Plus-Icon shown on avatars if you don't follow the user. Just like on Mobile!
 
 ![](https://i.imgur.com/nv8k9dV.png)
 [<img src="https://i.imgur.com/keJqWPD.png">](https://bsky.app/profile/invertex.xyz/post/3lig6enxj6s2d)
