@@ -6,7 +6,7 @@ Install a userscript addon for your browser, preferably [TamperMonkey](https://w
 Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js), or open the RAW of `bsky_enhancer.user.js` in this repository.
 
 ## FEATURES:
-- Source-quality video playback. `(Won't work on Chrome due to lacking functionality, but highest-quality stream will play instantly!)`
+- Source-quality video playback. `(Only browsers other than Chrome can do this, but highest-quality stream will play instantly!)`
 - Download video button below posts.
 - Custom context menu on media for interacting with the source-quality content
 - Saves files with proper attribution e.g: `didplc-ewm2epvgjd5prkys3w3oh37k_(invertex.xyz)_2024-11-22_3lbltee7tz62n_1.jpg`
