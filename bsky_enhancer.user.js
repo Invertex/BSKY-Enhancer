@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.27
+// @version      0.29
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -122,8 +122,26 @@ div[thd_customctx]:has(video[downloading]) {
 .context-menu ul { padding: 0px; margin: 0px; min-width: 190px; list-style: none;}
 .context-menu ul li { padding-bottom: 7px; padding-top: 7px; border: 1px solid #0e0e0e; color:#c1bcbc; font-family: sans-serif; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;}
 .context-menu ul li:hover { background: #202020;}
-`);
 
+:root {
+--bskyEN-tab-on-var: rgb(32, 139, 254) !important;
+--bskyEN-tabtext-on-var: rgb(241, 243, 245) !important;
+--bskyEN-tabtext-off-var: rgb(147, 165, 183) !important;
+}
+
+.bskyEN-tab-off {
+background-color: rgb(0,0,0,0) !important;
+}
+.bskyEN-tab-on {
+background-color: var(--bskyEN-tab-on-var) !important;
+}
+.bskyEN-tabtext-on {
+color: var(--bskyEN-tabtext-on-var) !important;
+}
+.bskyEN-tabtext-off {
+color: var(--bskyEN-tabtext-off-var) !important;
+}
+`);
 
 const linkSVG = `<svg class="vxLinkSVG vxDlSVG" xmlns="http://www.w3.org/2000/svg" version="1.1" id="Layer_1" x="0px" y="0px" width="24" height="24" viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve">
 <path fill="white" d="M459.654,233.373l-90.531,90.5c-49.969,50-131.031,50-181,0c-7.875-7.844-14.031-16.688-19.438-25.813  l42.063-42.063c2-2.016,4.469-3.172,6.828-4.531c2.906,9.938,7.984,19.344,15.797,
@@ -558,7 +576,7 @@ class BSKYUser
     {
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
-//https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:pm5th6wleza3vslz2lqdlgqr/bafkreih2xvzfaqddi7cbgkx3ymmtntorlauxps3fau3k4prdwrrdzzjllm@jpeg
+
     static findPostFromImage(imgURL)
     {
         let parts = imgURL.split('/img/').at(-1).split('/');
@@ -610,9 +628,9 @@ class BSKYUser
     }
 }
 
-/*** PROCESSING ***/
 
-//beccanical.bsky.social/3lkhxtd3vr22f
+
+/*** PROCESSING ***/
 async function processFeedItem(feedItem)
 {
     let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"],div[role="link"][data-testid^="postThreadItem-"],div[data-testid^="postThreadItem-"]:has(div[role="link"]),div[role="link"]', argsChildAndSub);
@@ -689,8 +707,84 @@ function onPanelsAdded(addItems)
     addItems.forEach(checkPanel);
 }
 
+var useLikesList = false;
+
+function processProfileTabs(profileScreen)
+{
+    let tabList = profileScreen.querySelector('div[role="tablist"][data-testid="profilePager"] div[data-testid="profilePager-selector"]');
+
+    if(tabList == null || addHasModified(tabList)) { return; }
+
+    let repliesTab = tabList.querySelector('div[data-testid="profilePager-selector-1"]');
+    let postsTab = tabList.querySelector('div[data-testid="profilePager-selector-0"]');
+
+    if(repliesTab)
+    {
+        let tabs = tabList.querySelectorAll('div[role="tablist"] div[data-testid^="profilePager-sel"]');
+        for(let t = 0; t < tabs.length; t++)
+        {
+            let tab = tabs[t];
+            let tabBottom = tab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
+
+            if(tabBottom && tabBottom?.style)
+            {
+                let bottomTabColor = tabBottom.style.backgroundColor;
+                let selTextColor = tabBottom.parentElement.style.color;
+
+                document.documentElement.style.setProperty("--bskyEN-tab-on-var", bottomTabColor);
+                document.documentElement.style.setProperty("--bskyEN-tabtext-on-var", selTextColor);
+
+                break;
+            }
+
+        }
+
+
+        let likesTab = repliesTab.cloneNode(true);
+        likesTab.setAttribute('data-testid','profilePager-selector-25');
+        let likesBottom = likesTab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
+        let likesBottomHolder = likesBottom.parentElement;
+
+        document.documentElement.style.setProperty("--bskyEN-tabtext-off-var", likesBottomHolder.style.color);
+
+        likesTab.appendChild(likesBottom);
+        likesBottomHolder.innerText = "Likes";
+        likesBottomHolder.appendChild(likesBottom);
+        likesBottomHolder.setAttribute('data-testid','profilePager-Likes');
+        let repliesBottom = repliesTab.firstElementChild.querySelector('div[data-testid^="profilePager-Replies"] > div');
+        let repliesBottomHolder = repliesBottom.parentElement;
+
+        repliesTab.after(likesTab);
+
+
+        likesTab.addEventListener('click', function(e) {
+            useLikesList = true;
+            repliesTab.click();
+            useLikesList = true;
+            addClassName(likesBottomHolder,"bskyEN-tabtext-on");
+            addClassName(likesBottom,"bskyEN-tab-on");
+            addClassName(repliesBottom,"bskyEN-tab-off");
+            addClassName(repliesBottomHolder,"bskyEN-tabtext-off");
+        });
+        //Cleanup our custom styling
+        tabs.forEach((tab)=>{
+            tab.addEventListener('click',function(e) {
+                removeClassName(likesBottom,"bskyEN-tab-on");
+                removeClassName(likesBottomHolder, "bskyEN-tabtext-on");
+                removeClassName(repliesBottomHolder, "bskyEN-tabtext-off");
+                removeClassName(repliesBottom,"bskyEN-tab-off");
+            });
+        });
+
+        repliesTab.addEventListener('click', (e)=> {
+            useLikesList = false;
+        });
+    }
+}
+
 async function onNewPageLoaded()
 {
+    useLikesList = false;
     let root = await awaitElem(document, 'body #root main', argsChildAndSub);
     let panelsRoot = root.parentElement;
     if(!addHasModified(panelsRoot)) {
@@ -698,7 +792,10 @@ async function onNewPageLoaded()
         watchForAddedNodes(panelsRoot, false, { attributes: false, childList: true }, onPanelsAdded);
     }
 
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(setupScreenWatch);
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(async (profileScreen) => {
+        await setupScreenWatch(profileScreen);
+        processProfileTabs(profileScreen);
+    });
     awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, 'div[style*="display: flex"] [data-testid="profileListScreen"]', argsChildAndSub).then(setupScreenWatch);
     awaitElem(root, 'div[style*="display: flex"] [data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="postThread"])', argsChildAndSub).then(setupFeedWatch);
@@ -865,26 +962,15 @@ function byteLengthCharCode(str)
   return s;
 }
 
-/*
-function getFollows(username, did)
+function removeClassName(elem, className)
 {
-//TODO: Has a limit of 100, need to find follow count and loop over this to get the full list
-    fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getFollows?actor=${did}&limit=100`,
-         {
-        "headers": {
-            "accept": '*//*',
-            "accept-encoding":"gzip, deflate, br, zstd",
-            "accept-language": "en-US,en;q=0.9",
-            "authorization": bear,
-        },
-        "body": null,
-        "origin":"https://bsky.app",
-        "referer":"https://bsky.app/",
-        "method": "GET",
-        "mode": "cors"
-    });
-}*/
+    elem.classList.remove(className);
+}
 
+function addClassName(elem, className)
+{
+    elem.classList.add(className);
+}
 
 //<--> RIGHT-CLICK CONTEXT MENU STUFF START <-->//
 var ctxMenu;
@@ -906,7 +992,6 @@ function initializeCtxMenu()
     ctxMenu.id = "contextMenu";
     ctxMenu.className = "context-menu";
     ctxMenuList = document.createElement('ul');
-    //ctxMenuList.style.zIndex = 500;
     ctxMenu.appendChild(ctxMenuList);
 
     ctxMenuOpenInNewTab = createCtxMenuItem(ctxMenuList, "Open Image in New Tab");
@@ -1167,8 +1252,46 @@ async function checkCreateRecordForFollow(record)
     }
 }
 
+async function getLikedPosts(likesRec, feedObj)
+{
+    let likeQuery = encodeURIComponent(likesRec.records[0].value.subject.uri);
+    for(let i = 1; i < likesRec.records.length; i++)
+    {
+        likeQuery += '&uris=' + encodeURIComponent(likesRec.records[i].value.subject.uri);
+    }
+
+    likeQuery = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=' + likeQuery;
+    const likePostsResp = await fetch(likeQuery,
+                                      {
+        "headers": {
+            "accept": '*//*',
+            "accept-encoding":"gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9",
+            "authorization": bear,
+        },
+        "body": null,
+        "origin":"https://bsky.app",
+        "referer":"https://bsky.app/",
+        "method": "GET",
+        "mode": "cors"
+    });
+    let likedPosts = await likePostsResp.json();
+    let removedCnt = 0;
+    let postCnt = likedPosts.posts.length;
+
+    for(let p = 0; p < postCnt; p++)
+    {
+        if(removedCnt > (postCnt - 2) || Object.hasOwn(likedPosts.posts[p],'embed'))
+        {
+            feedObj.feed.push({post:likedPosts.posts[p]});
+       } else { removedCnt += 1;}
+    }
+}
+
+var lastCursor = "";
+
 unsafeWindow.fetch = exportFunction(async (...args) => {
-    const [resource, config] = args;
+    let [resource, config] = args;
 
     let isGetSession = (resource?.constructor === URL && resource.href.includes('server.getSession'));
     let isRequest = resource?.constructor === Request;
@@ -1182,6 +1305,43 @@ unsafeWindow.fetch = exportFunction(async (...args) => {
         if(config?.headers?.has("authorization"))
         {
             bear = config?.headers?.get("authorization");
+        }
+    }
+    else if(useLikesList === true && isRequest && resource.url.includes('.getAuthorFeed?') && resource.url.includes('=posts_with_replies'))
+    {
+        let did = resource.url.split('actor=').at(-1).split('&')[0];
+
+        let cursor = "";
+        if(!resource.url.includes('cursor='))
+        {
+            lastCursor = "";
+       }
+
+        let feedObj = {feed:[]};
+        let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&filter=posts_with_media&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
+        const likesRecResp = await originalFetch(likesRecReq, config);
+        let likesRec = await likesRecResp.json();
+        let recordCnt = likesRec.records.length;
+
+        if(recordCnt > 0)
+        {
+            await getLikedPosts(likesRec, feedObj);
+            if(feedObj.feed.length > 0)
+            {
+                if(recordCnt >= 25) {
+                    lastCursor = likesRec.cursor;
+                    feedObj.cursor = likesRec.cursor;
+                }
+
+                tryProcessFeedData(feedObj);
+                modifyTagsText(feedObj);
+
+                return new Response(JSON.stringify(feedObj), {
+                    status: likesRecResp.status,
+                    statusText: likesRecResp.statusText,
+                    headers: likesRecResp.headers
+                });
+            }
         }
     }
 
@@ -1203,8 +1363,8 @@ unsafeWindow.fetch = exportFunction(async (...args) => {
             headers: response.headers
         });
     }
-
     return response;
+
 }, unsafeWindow);
 
 
