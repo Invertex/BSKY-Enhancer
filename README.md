@@ -1,5 +1,5 @@
 # BSKY-Enhancer
-QoL improvements for BSKY, including media download, higher quality playback, attribution in filenames and much more!
+QoL improvements for BSKY, including media download, "Likes" feeds visible, highest-quality playback, attribution in filenames and much more!
 
 ## Installation:
 Install a userscript addon for your browser, preferably [TamperMonkey](https://www.tampermonkey.net/).</br>
@@ -7,6 +7,7 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
 
 ## FEATURES:
 - Source-quality video playback. `(Chrome can't, but highest-quality stream will play instantly!)`
+- Shoe "Likes" feed on all profiles!
 - Download video button below posts.
 - Custom context menu on media for interacting with the source-quality content
 - Saves files with proper attribution e.g:
@@ -17,6 +18,7 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
 - Hidden "hashtags" show on the post! (other apps like deck.blue can make posts with the tags hidden in data)
 - Plus-Icon shown on avatars if you don't follow the user. Just like on Mobile!
 
+![](https://i.imgur.com/PylWOw3.png)
 ![](https://i.imgur.com/nv8k9dV.png)
 [<img src="https://i.imgur.com/keJqWPD.png">](https://bsky.app/profile/invertex.xyz/post/3lig6enxj6s2d)
 >(Future improvements to come. May add timeline width adjustment at some point as well.)
