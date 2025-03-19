@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.29
+// @version      0.30
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -714,7 +714,8 @@ function processProfileTabs(profileScreen)
     let tabList = profileScreen.querySelector('div[role="tablist"][data-testid="profilePager"] div[data-testid="profilePager-selector"]');
 
     if(tabList == null || addHasModified(tabList)) { return; }
-
+    let personalLikesTab = tabList.querySelector('div[data-testid="profilePager-Likes"]');
+    if(personalLikesTab) { return; }
     let repliesTab = tabList.querySelector('div[data-testid="profilePager-selector-1"]');
     let postsTab = tabList.querySelector('div[data-testid="profilePager-selector-0"]');
 
