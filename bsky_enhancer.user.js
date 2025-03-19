@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.30
+// @version      0.32
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -1261,7 +1261,7 @@ async function getLikedPosts(likesRec, feedObj)
         likeQuery += '&uris=' + encodeURIComponent(likesRec.records[i].value.subject.uri);
     }
 
-    likeQuery = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=' + likeQuery;
+    likeQuery = 'https://bsky.social/xrpc/app.bsky.feed.getPosts?uris=' + likeQuery;
     const likePostsResp = await fetch(likeQuery,
                                       {
         "headers": {
