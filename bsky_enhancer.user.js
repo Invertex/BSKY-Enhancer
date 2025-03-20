@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.32
+// @version      0.33
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -14,12 +14,15 @@
 // @connect      media.tenor.com
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
+// @grant        GM.xmlhttpRequest
 // @grant        GM_download
 // @grant        GM_setClipboard
+// @grant        GM_addStyle
 // @grant        unsafeWindow
 // @run-at       document-start
-// @require      https://github.com/Invertex/Invertex-Userscript-Tools/raw/f8b74b4238884620734e5d813070135bd224e7ae/userscript_tools.js
+// @require      https://raw.githubusercontent.com/Invertex/Invertex-Userscript-Tools/4dee87b7062752f39ba5ec8a780011682b0ffde4/userscript_tools.js
 // ==/UserScript==
+
 
 'use strict';
 
@@ -52,7 +55,7 @@ function downloadFile(url, filename, timeout = -1)
 }
 
 
-addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
+GM_addStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
 }
 .bskyhd-copy-link{
@@ -92,7 +95,7 @@ div.bskyIVX_followIcon {
 }`);
 
 
-addGlobalStyle(`@-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
+GM_addStyle(`@-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
 div#thd_button_Download[downloading] {
   pointer-events: none !important;
 }
@@ -118,10 +121,10 @@ div[thd_customctx]:has(video[downloading]) {
 }
 @keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
 .loader { border: 16px solid #f3f3f373; display: -webkit-box; display: -ms-flexbox; display: flex; margin: auto; border-top: 16px solid #3498db99; border-radius: 50%; width: 120px; height: 120px; -webkit-animation: spin 2s linear infinite; animation: spin 2s linear infinite;}
-.context-menu { position: absolute; text-align: center; margin: 0px; background: #040404; border: 1px solid #0e0e0e; border-radius: 5px;}
-.context-menu ul { padding: 0px; margin: 0px; min-width: 190px; list-style: none;}
-.context-menu ul li { padding-bottom: 7px; padding-top: 7px; border: 1px solid #0e0e0e; color:#c1bcbc; font-family: sans-serif; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;}
-.context-menu ul li:hover { background: #202020;}
+.bskyEN-context-menu { position: absolute; text-align: center; margin: 0px; background: #040404; border: 1px solid #0e0e0e; border-radius: 5px;}
+.bskyEN-context-menu ul { padding: 0px; margin: 0px; min-width: 190px; list-style: none;}
+.bskyEN-context-menu ul li { padding-bottom: 7px; padding-top: 7px; border: 1px solid #0e0e0e; color:#c1bcbc; font-family: sans-serif; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;}
+.bskyEN-context-menu ul li:hover { background: #202020;}
 
 :root {
 --bskyEN-tab-on-var: rgb(32, 139, 254) !important;
@@ -268,7 +271,7 @@ class BSKYPost
 
             if(link.startsWith('https://bsky.app/'))
             {
-                link = link.replace('https://bsky.app/','https://bskyx.app/');
+                link = link.replace('https://bsky.app/','https://fxbsky.app/');
             }
             navigator.clipboard.writeText(link);
             window.setTimeout(()=>{
@@ -990,8 +993,8 @@ function initializeCtxMenu()
 {
     ctxMenu = document.createElement('div');
     ctxMenu.style.zIndex = "500";
-    ctxMenu.id = "contextMenu";
-    ctxMenu.className = "context-menu";
+    ctxMenu.id = "bskyENcontextMenu";
+    ctxMenu.className = "bskyEN-context-menu";
     ctxMenuList = document.createElement('ul');
     ctxMenu.appendChild(ctxMenuList);
 
@@ -1017,10 +1020,7 @@ function initializeCtxMenu()
 
     setContextMenuVisible(false);
 
-    window.addEventListener('locationchange', function () {
-        setContextMenuVisible(false);
-    });
-    window.addEventListener('popstate',() => {
+    unsafeWindow.addEventListener('locationchange', function () {
         setContextMenuVisible(false);
     });
 }
@@ -1153,7 +1153,7 @@ async function updateContextMenuLink(selContext)
             setContextMenuVisible(false);
             try
             {
-                GM.xmlHttpRequest({
+                GM_xmlhttpRequest({
                     method: 'GET',
                     url: selContext.ImageData.urlSRC,
                     responseType: 'blob',
@@ -1184,7 +1184,7 @@ async function updateContextMenuLink(selContext)
         ctxMenuCopyAddress.onclick = (e) => { copyAddress(selContext.ImageData.urlSRC); };
         ctxMenuGRIS.onclick = () => {
             setContextMenuVisible(false);
-            unsafeWindow.open("https://www.google.com/searchbyimage?sbisrc=cr_1_5_2&image_url=" + selContext.ImageData.url);
+            unsafeWindow.open("https://www.google.com/searchbyimage?sbisrc=cr_1_5_2&image_url=" + encodeURIComponent(selContext.ImageData.urlSRC));
         };
     }
     else //Video
@@ -1262,7 +1262,7 @@ async function getLikedPosts(likesRec, feedObj)
     }
 
     likeQuery = 'https://bsky.social/xrpc/app.bsky.feed.getPosts?uris=' + likeQuery;
-    const likePostsResp = await fetch(likeQuery,
+    const likePostsResp = await originalFetch(likeQuery,
                                       {
         "headers": {
             "accept": '*//*',
@@ -1465,9 +1465,8 @@ unsafeWindow.addEventListener('locationchange', function () {
 (async function()
  {
     console.log("start userscript");
-    initializeCtxMenu();
-
     let root = await awaitElem(document, 'body #root', argsChildAndSub);
+    initializeCtxMenu();
     onNewPageLoaded();
 
 })();
