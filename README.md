@@ -2,7 +2,7 @@
 QoL improvements for BSKY, including media download, "Likes" feeds visible, highest-quality playback, attribution in filenames and much more!
 
 ## Installation:
-Install a userscript addon for your browser, preferably [TamperMonkey](https://www.tampermonkey.net/) or ViolentMonkey. <sub>(Will not work proper with Greasemonkey*)</sub><br/>
+Install a userscript addon for your browser, preferably [TamperMonkey](https://www.tampermonkey.net/) or ViolentMonkey. <sub>(Will not work proper with GreaseMonkey*)</sub><br/>
 Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js), or open the RAW of `bsky_enhancer.user.js` in this repository.
 
 ## FEATURES:
