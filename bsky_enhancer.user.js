@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.33
+// @version      0.34
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -141,6 +141,9 @@ color: var(--bskyEN-tabtext-on-var) !important;
 }
 .bskyEN-tabtext-off {
 color: var(--bskyEN-tabtext-off-var) !important;
+}
+.force-column-flex {
+flex-direction: column !important;
 }
 `);
 
@@ -349,6 +352,17 @@ class BSKYPost
         if (vidElem == null) { return; }
         let selTarget = vidElem.parentElement.parentElement.parentElement.parentElement.parentElement;
 
+        let borderElem = selTarget.closest('div[style*="border-radius:"]');
+        if(borderElem)
+        {
+            let styleParent = borderElem.parentElement;
+            styleParent.style.position = "relative";
+            styleParent.style.maxHeight = "max(90vh, 800px)";
+            styleParent.style.flexDirection = "column";
+            styleParent.parentElement.style.paddingTop = 0;
+
+        }
+
         let selContext = new SelectionCtx(this, selTarget, false, true, vidElem);
         addCustomCtxMenu(selContext);
 
@@ -372,12 +386,33 @@ class BSKYPost
 
         let images = this.embedRecord.images;
         let imgcnt = images.length;
+
+        // Setup better layout for singular images that utilizes more screenspace
+        // Very helpful for tall images.
+        if(imgcnt == 1)
+        {
+            let borderElem = imageElemLoaded.closest('div[style*="border-radius:"]');
+            if(borderElem)
+            {
+                borderElem.style.height = "inherit";
+                borderElem.style.maxHeight = "max(100vh, 900px)";
+                let parentElem = borderElem.parentElement;
+                addClassName(parentElem, 'force-column-flex')
+
+                parentElem.style.position = "inherit";
+                parentElem.parentElement.style.paddingTop = 0;
+            }
+        }
+
         for(let i = 0; i < imgcnt; i++)
         {
             let imgData = this.embedRecord.images[i];
 
             let imgElem = await awaitElem(this.postElem, `img[src*="${imgData.image.ref.$link}"]`, argsChildAndSub);
             let selContext = new SelectionCtx(this, imgElem, true, false);
+            // Force HQ Image. Off for now, may add option in future if I do timeline scaling.
+        //    imgElem.src = selContext.ImageData.urlSRC;
+
             addCustomCtxMenu(selContext);
         }
     }
@@ -689,7 +724,7 @@ async function setupScreenWatch(screenElem)
 
 async function checkPanel(panel)
 {
-    if(panel.firstElementChild.tagName == 'BUTTON')
+    if(panel?.firstElementChild?.tagName == 'BUTTON')
     {
         let img = await awaitElem(panel.firstElementChild, 'IMG[src*="/img/"]', argsChildAndSub);
         if(img)
@@ -1082,6 +1117,8 @@ function wasShowDefaultContextClicked()
 
 class SelectionCtx
 {
+    cachedImgData = null;
+
     constructor(postData, targetElem, isImage, isVideo, vidElem = null)
     {
         this.postData = postData;
@@ -1098,7 +1135,11 @@ class SelectionCtx
 
     get ImageData()
     {
-        return this.postData.getImageDataFromURL(this.targetElem.src);
+        if(this.cachedImgData == null) {
+            this.cachedImgData = this.postData.getImageDataFromURL(this.targetElem.src);
+        }
+
+        return this.cachedImgData;
     }
 }
 
@@ -1279,9 +1320,11 @@ async function getLikedPosts(likesRec, feedObj)
     let removedCnt = 0;
     let postCnt = likedPosts.posts.length;
 
+    var thirdCnt = Math.ceil(postCnt / 3);
+
     for(let p = 0; p < postCnt; p++)
     {
-        if(removedCnt > (postCnt - 2) || Object.hasOwn(likedPosts.posts[p],'embed'))
+        if(postCnt < 25 || removedCnt >= thirdCnt || Object.hasOwn(likedPosts.posts[p],'embed'))
         {
             feedObj.feed.push({post:likedPosts.posts[p]});
        } else { removedCnt += 1;}
