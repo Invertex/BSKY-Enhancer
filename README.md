@@ -7,7 +7,7 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
 
 ## FEATURES:
 - Source-quality video playback. `(Chrome can't, but highest-quality stream will play instantly!)`
-- Shoe "Likes" feed on all profiles!
+- Show "Likes" feed on all profiles!
 - Download video button below posts.
 - Custom context menu on media for interacting with the source-quality content
 - Saves files with proper attribution e.g:
