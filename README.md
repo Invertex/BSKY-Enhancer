@@ -16,7 +16,7 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
   - And includes user's "DID" so they can be found even if their Handle/Username changes!
 - Adds a "Copy Link" button below media posts to automatically copy it as a `bskyx.app` link, so the media will embed properly when pasted elsewhere.
 - Hidden "hashtags" show on the post! (other apps like deck.blue can make posts with the tags hidden in data)
-- Plus-Icon shown on avatars if you don't follow the user. Just like on Mobile!
+- Not-following status icon on avatars if you don't follow the user. Just like on Mobile!
 
 ![](https://i.imgur.com/PylWOw3.png)
 ![](https://i.imgur.com/nv8k9dV.png)
