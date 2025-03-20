@@ -15,42 +15,39 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bsky.app
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
+// @grant        GM.download
 // @grant        GM_setClipboard
 // @grant        unsafeWindow
 // @run-at       document-start
 // @require      https://github.com/Invertex/Invertex-Userscript-Tools/raw/f8b74b4238884620734e5d813070135bd224e7ae/userscript_tools.js
 // ==/UserScript==
 
-'use strict';
 
-var bear = "";
+const { fetch: originalFetch } = window;
+
+
 var myDID = null;
 const GM_OpenInTabMissing = (typeof GM_openInTab === 'undefined');
 const is_chrome = navigator?.userAgent?.includes('Chrome') ?? false
 
-function downloadFile(url, filename, timeout = -1)
-{
-     return new Promise((resolve, reject) =>
-    {
-         const dl = GM_download(
-             {
-                 name: filename,
-                 url: url,
-                 onload: resolve,
-                 onerror: reject,
-                 ontimeout: reject,
-                 saveAs: true
-             });
-        if(timeout >= 0)
-        {
-              window.setTimeout(()=> {
+function downloadFile(url, filename, timeout = -1) {
+    return new Promise((resolve, reject) => {
+        const dl = GM.download({
+            name: filename,
+            url: url,
+            onload: resolve,
+            onerror: reject,
+            ontimeout: reject,
+            saveAs: true
+        });
+        if (timeout >= 0) {
+            window.setTimeout(() => {
                 dl?.abort();
                 reject(null);
             }, timeout);
         }
     });
 }
-
 
 addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     fill: rgba(255, 255, 255, 0.5);
@@ -59,19 +56,16 @@ addGlobalStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
   background: transparent;
   border: none;
 }
-.bskyhd-copy-link[clicked] > svg.vxLinkSVG > path
-{
+.bskyhd-copy-link[clicked] > svg.vxLinkSVG > path{
   animation-iteration-count: infinite;
   animation-duration: 2s;
   animation-name: copylink-animation;
   pointer-events: none !important;
 }
-.bskyhd-copy-link[clicked], .bskyhd-copy-link[clicked] > svg.vxLinkSVG
-{
+.bskyhd-copy-link[clicked], .bskyhd-copy-link[clicked] > svg.vxLinkSVG{
   pointer-events: none !important;
 }
-@keyframes copylink-animation
-{
+@keyframes copylink-animation{
     0%
     {
         fill: rgba(255, 50, 40, 0.95);
@@ -90,7 +84,6 @@ div.bskyIVX_followIcon {
     margin-left: 1.6em;
     margin-top: 1.7em;
 }`);
-
 
 addGlobalStyle(`@-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); } }
 div#thd_button_Download[downloading] {
@@ -157,8 +150,7 @@ const followSVG = `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width
 </svg>`;
 
 /*** CLASSES ***/
-class BSKYPost
-{
+class BSKYPost{
     static cache = new Map();
 
     record = null;
@@ -170,12 +162,20 @@ class BSKYPost
     followIcon = null;
     recordWithMedia = false;
 
-    get URI() { return this.Data.uri; }
-    get CID() { return this.Data.cid; }
-    get DID() { return this.Data.author.did; }
-    get Handle() { return this.Data.author.handle; }
+    get URI() {
+        return this.Data.uri;
+    }
+    get CID() {
+        return this.Data.cid;
+    }
+    get DID() {
+        return this.Data.author.did;
+    }
+    get Handle() {
+        return this.Data.author.handle;
+    }
 
-    get Tags(){
+    get Tags() {
         return this?.record?.tags ?? [];
     }
 
@@ -184,30 +184,28 @@ class BSKYPost
     }
 
     get VideoSource() {
-       return getSourceURL(this.Data.author.did, this.video.ref.$link);
+        return getSourceURL(this.Data.author.did, this.video.ref.$link);
     }
 
-    get PostDate()
-    {
+    get PostDate() {
         return formatFilenameDate(this.record.createdAt);
     }
 
-    get FilenameBase()
-    {
+    get FilenameBase() {
         return `${this.DID.replace('did:plc:','didplc-')}_(${this.Handle})_${this.PostDate}_${this.postID}`;
     }
 
     /*** EVENTS ***/
     onFollowingChanged = new EventTarget();
 
-    listenForFollowChange(callbackMethod)
-    {
+    listenForFollowChange(callbackMethod) {
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
 
-    async downloadVideoButtonClicked()
-    {
-        if(this.isVideoDownloading) { return; }
+    async downloadVideoButtonClicked() {
+        if (this.isVideoDownloading) {
+            return;
+        }
         this.setDownloadingState(true);
         const ext = BSKYPost.extensionFromMimeType(this.record.embed.video.mimeType);
         let filename = `${this.FilenameBase}${ext}`;
@@ -215,125 +213,134 @@ class BSKYPost
         this.setDownloadingState(false);
     }
 
-    downloadImageClicked(imgThumbURL)
-    {
+    downloadImageClicked(imgThumbURL) {
         let imgData = this.getImageDataFromURL(imgThumbURL);
 
-        if(imgData)
-        {
+        if (imgData) {
             var filename = "";
-            if(this.embedRecord?.images?.length > 1)
-            {
+            if (this.embedRecord?.images?.length > 1) {
                 filename = `${this.FilenameBase}_${imgData.index}${imgData.extension}`;
-            } else { filename = `${this.FilenameBase}${imgData.extension}`; }
+            } else {
+                filename = `${this.FilenameBase}${imgData.extension}`;
+            }
             downloadFile(imgData.urlSRC, filename);
         }
     }
 
-    updateFollowIcon(followIcon, followStatus)
-    {
-        if(followIcon != null)
-        {
+    updateFollowIcon(followIcon, followStatus) {
+        if (followIcon != null) {
             followIcon.style.display = followStatus.detail.isFollowing === 1 ? "none" : "block";
         }
     }
 
     /*** UTILITY ***/
-    tryGetPostDataForFullScreen(imgThumb)
-    {
-        if(this.images == null || this.images.length == 0 || this.embedExternal != null) { return null; }
+    tryGetPostDataForFullScreen(imgThumb) {
+        if (this.images == null || this.images.length == 0 || this.embedExternal != null) {
+            return null;
+        }
         let imgDat = this.getImageDataFromURL(imgThumb);
-        if(imgDat)
-        {
-            return { post: this, imgData: imgDat};
+        if (imgDat) {
+            return {
+                post: this,
+                imgData: imgDat
+            };
         }
         return null;
     }
 
-    get isVideoDownloading() { return this.videoDLButton.hasAttribute('downloading'); }
-
-    setDownloadingState(downloading)
-    {
-        if(downloading == true) { this.videoDLButton.setAttribute('downloading', ''); }
-        else if(this.videoDLButton.hasAttribute('downloading')) { this.videoDLButton.removeAttribute('downloading'); }
+    get isVideoDownloading() {
+        return this.videoDLButton.hasAttribute('downloading');
     }
 
-    copyPostLink()
-    {
-        if(this.copyBtn.hasAttribute('clicked')) { return; }
-        if(this.link)
-        {
+    setDownloadingState(downloading) {
+        if (downloading == true) {
+            this.videoDLButton.setAttribute('downloading', '');
+        } else if (this.videoDLButton.hasAttribute('downloading')) {
+            this.videoDLButton.removeAttribute('downloading');
+        }
+    }
+
+    copyPostLink() {
+        if (this.copyBtn.hasAttribute('clicked')) {
+            return;
+        }
+        if (this.link) {
             this.copyBtn.setAttribute('clicked', '');
             let link = this.link;
 
-            if(link.startsWith('https://bsky.app/'))
-            {
-                link = link.replace('https://bsky.app/','https://bskyx.app/');
+            if (link.startsWith('https://bsky.app/')) {
+                link = link.replace('https://bsky.app/', 'https://bskyx.app/');
             }
             navigator.clipboard.writeText(link);
-            window.setTimeout(()=>{
-                if(this.copyBtn.hasAttribute('clicked'))
-                {
+            window.setTimeout(() => {
+                if (this.copyBtn.hasAttribute('clicked')) {
                     this.copyBtn.removeAttribute('clicked');
                 }
             }, 2000);
         }
     }
 
-    static extensionFromMimeType(mimeType)
-    {
+    static extensionFromMimeType(mimeType) {
         let importantPart = mimeType.split('/').at(-1);
-        switch(importantPart)
-        {
-            case "jpeg":
-                return ".jpg";
-            case "png":
-                return ".png";
-            case "webp":
-                return ".webp";
-            case "webm":
-                return ".webm";
-            case "gif":
-                return ".gif";
-            default:
-                return '.' + importantPart;
+        switch (importantPart) {
+        case "jpeg":
+            return ".jpg";
+        case "png":
+            return ".png";
+        case "webp":
+            return ".webp";
+        case "webm":
+            return ".webm";
+        case "gif":
+            return ".gif";
+        default:
+            return '.' + importantPart;
         }
 
         return '.' + importantPart;
     }
 
-    getImageDataFromURL(imgThumbURL)
-    {
-        if(this.embedExternal != null)
-        {
+    getImageDataFromURL(imgThumbURL) {
+        if (this.embedExternal != null) {
             let url = this.embedExternal.uri;
             let extensionName = '.' + url.split('?')[0].split('.').at(-1);
-            return { url: url, urlSRC:url, index: -1, extension: extensionName};
+            return {
+                url: url,
+                urlSRC: url,
+                index: -1,
+                extension: extensionName
+            };
+        } else if (this.embedRecord.images == null) {
+            return null;
         }
-        else if(this.embedRecord.images == null) { return null; }
 
-        for(let i = 0; i < this.embedRecord.images.length; i++)
-        {
+        for (let i = 0; i < this.embedRecord.images.length; i++) {
             let imgRecord = this.embedRecord.images[i];
-            if(Object.hasOwn(imgRecord, 'image')) {imgRecord = imgRecord.image; }
-            if(imgThumbURL.includes(imgRecord.ref.$link))
-            {
+            if (Object.hasOwn(imgRecord, 'image')) {
+                imgRecord = imgRecord.image;
+            }
+            if (imgThumbURL.includes(imgRecord.ref.$link)) {
                 let extensionName = BSKYPost.extensionFromMimeType(imgRecord.mimeType);
                 let srcURL = getSourceURL(this.AuthorData.did, imgRecord.ref.$link);
 
-                return { url: imgRecord.fullsize, urlSRC:srcURL, index: i + 1, extension: extensionName};
+                return {
+                    url: imgRecord.fullsize,
+                    urlSRC: srcURL,
+                    index: i + 1,
+                    extension: extensionName
+                };
             }
         }
 
         return null;
     }
 
-
     /*** SETUP ***/
 
-    async setupVideoElem()
-    {
-        if(this.postElem.querySelector('button[title="Download"]')) { return; }
+    async setupVideoElem() {
+        if (this.postElem.querySelector('button[title="Download"]')) {
+            return;
+        }
         this.videoDLButton = createDLButton();
         this.videoDLButton.onclick = (e) => {
             e.stopPropagation();
@@ -344,34 +351,39 @@ class BSKYPost
 
         let vidElem = await awaitElem(this.postElem, 'video', argsChildAndSub);
 
-        if (vidElem == null) { return; }
+        if (vidElem == null) {
+            return;
+        }
         let selTarget = vidElem.parentElement.parentElement.parentElement.parentElement.parentElement;
 
         let selContext = new SelectionCtx(this, selTarget, false, true, vidElem);
         addCustomCtxMenu(selContext);
 
-        if (is_chrome == true) { return; }
+        if (is_chrome == true) {
+            return;
+        }
         vidElem.preload = 'auto';
         vidElem.src = this.VideoSource;
     }
 
-    setupFullscreenImageContext(fullscreenElem)
-    {
+    setupFullscreenImageContext(fullscreenElem) {
         let selContext = new SelectionCtx(this, fullscreenElem, true, false);
         addCustomCtxMenu(selContext);
     }
 
-    async setupImageElems()
-    {
+    async setupImageElems() {
         let imageElemLoaded = await awaitElem(this.postElem, 'img[src*="/img/feed_"]', argsChildAndSub);
-        if(addHasModified(imageElemLoaded)) { return; }
+        if (addHasModified(imageElemLoaded)) {
+            return;
+        }
 
-        if(this?.embedRecord == null || this?.embedRecord?.images == null) { return; }
+        if (this?.embedRecord == null || this?.embedRecord?.images == null) {
+            return;
+        }
 
         let images = this.embedRecord.images;
         let imgcnt = images.length;
-        for(let i = 0; i < imgcnt; i++)
-        {
+        for (let i = 0; i < imgcnt; i++) {
             let imgData = this.embedRecord.images[i];
 
             let imgElem = await awaitElem(this.postElem, `img[src*="${imgData.image.ref.$link}"]`, argsChildAndSub);
@@ -380,10 +392,11 @@ class BSKYPost
         }
     }
 
-    async setupExternalEmbed()
-    {
+    async setupExternalEmbed() {
         let vidElem = await awaitElem(this.postElem, 'video', argsChildAndSub);
-        if(vidElem == null || addHasModified(vidElem)) { return; }
+        if (vidElem == null || addHasModified(vidElem)) {
+            return;
+        }
         let selTarget = vidElem.parentElement.parentElement;
 
         this.images = [this.embedExternal.uri];
@@ -391,8 +404,7 @@ class BSKYPost
         addCustomCtxMenu(selContext);
     }
 
-    async processPostElement(post)
-    {
+    async processPostElement(post) {
         this.postElem = post;
 
         var iconElem = await awaitElem(this.postElem, 'a[href^="/profile/"]:has(div[data-testid="userAvatarImage"])', argsChildAndSub);
@@ -403,24 +415,22 @@ class BSKYPost
         this.followIcon = followIcon;
         this.followIcon.style.display = "none";
 
-        if(this.userData.following == 0)
-        {
+        if (this.userData.following == 0) {
             this.followIcon.style.display = "block";
         }
-        this.userData.listenForFollowChange((followUpdate)=>{this.updateFollowIcon(this.followIcon, followUpdate)});
+        this.userData.listenForFollowChange((followUpdate) => {
+            this.updateFollowIcon(this.followIcon, followUpdate)
+        });
 
         this.buttonBar = this.postElem.querySelector('div:has(> div > [data-testid="likeBtn"])');
 
-        if(this.embed != null)
-        {
-            if(!this.buttonBar.querySelector('button.bskyhd-copy-link'))
-            {
+        if (this.embed != null) {
+            if (!this.buttonBar.querySelector('button.bskyhd-copy-link')) {
                 this.copyBtn = document.createElement("button");
                 this.copyBtn.className = "bskyhd-copy-link";
                 this.copyBtn.innerHTML = linkSVG;
                 this.copyBtn.title = "Copy Video Embed Compatible Link";
-                this.copyBtn.onclick = (e)=>
-                {
+                this.copyBtn.onclick = (e) => {
                     e.stopPropagation();
                     this.copyPostLink();
                 };
@@ -429,17 +439,19 @@ class BSKYPost
 
             }
 
-            if(this.video) {await this.setupVideoElem(); }
-            else if (this.images != null && this.images.length > 0) { await this.setupImageElems(); }
-            else if (this.embedExternal != null) { await this.setupExternalEmbed(); }
+            if (this.video) {
+                await this.setupVideoElem();
+            } else if (this.images != null && this.images.length > 0) {
+                await this.setupImageElems();
+            } else if (this.embedExternal != null) {
+                await this.setupExternalEmbed();
+            }
         }
     }
 
-    static TryCreateNew(postData, newUserCache)
-    {
-        let post = Object.hasOwn(postData,'post') ? postData.post : postData;
-        if(!Object.hasOwn(post, 'author'))
-        {
+    static TryCreateNew(postData, newUserCache) {
+        let post = Object.hasOwn(postData, 'post') ? postData.post : postData;
+        if (!Object.hasOwn(post, 'author')) {
             console.warn("post null, something went wrong");
             return null;
         }
@@ -447,37 +459,35 @@ class BSKYPost
         let postID = post.uri.split('feed.post/').at(-1);
         let keyName = `${post.author.handle}/${postID}`;
 
-        if(!BSKYPost.cache.has(keyName))
-        {
+        if (!BSKYPost.cache.has(keyName)) {
             let newPost = new BSKYPost(post, postID, newUserCache);
             BSKYPost.cache.set(keyName, newPost);
         }
-        if(Object.hasOwn(postData, 'reply'))
-        {
-            if(Object.hasOwn(postData.reply, 'root'))
-            {
-                BSKYPost.TryCreateNew({post: postData.reply.root}, newUserCache);
+        if (Object.hasOwn(postData, 'reply')) {
+            if (Object.hasOwn(postData.reply, 'root')) {
+                BSKYPost.TryCreateNew({
+                    post: postData.reply.root
+                }, newUserCache);
             }
-            if(Object.hasOwn(postData.reply, 'parent'))
-            {
-                BSKYPost.TryCreateNew({post: postData.reply.parent}, newUserCache);
+            if (Object.hasOwn(postData.reply, 'parent')) {
+                BSKYPost.TryCreateNew({
+                    post: postData.reply.parent
+                }, newUserCache);
             }
         }
-        if(Object.hasOwn(postData, 'parent'))
-        {
-            BSKYPost.TryCreateNew({post: postData.parent.post}, newUserCache);
+        if (Object.hasOwn(postData, 'parent')) {
+            BSKYPost.TryCreateNew({
+                post: postData.parent.post
+            }, newUserCache);
         }
-        if(post.replyCount > 0 && Object.hasOwn(postData,"replies"))
-        {
-            for(let i = 0; i < postData.replies.length; i++)
-            {
-                BSKYPost.TryCreateNew(postData.replies[i], newUserCache) ;
+        if (post.replyCount > 0 && Object.hasOwn(postData, "replies")) {
+            for (let i = 0; i < postData.replies.length; i++) {
+                BSKYPost.TryCreateNew(postData.replies[i], newUserCache);
             }
         }
     }
 
-    constructor(postData, postID, newUserCache)
-    {
+    constructor(postData, postID, newUserCache) {
         this.Data = postData;
         this.postID = postID;
         this.embed = this.Data?.embed ?? this.Data?.embeds?.[0];
@@ -489,52 +499,42 @@ class BSKYPost
         this.video = null;
         this.images = null;
 
-        if(this.hasMedia)
-        {
-            if(this.embed.$type.includes('.recordWithMedia'))
-            {
+        if (this.hasMedia) {
+            if (this.embed.$type.includes('.recordWithMedia')) {
                 this.recordWithMedia = true;
-                this.quote = BSKYPost.TryCreateNew({post:this.embed.record.record}, newUserCache);
+                this.quote = BSKYPost.TryCreateNew({
+                    post: this.embed.record.record
+                }, newUserCache);
                 this.embed = this.embed.media;
                 this.embedRecord = this.record.embed.media;
                 hasImage = Object.hasOwn(this.embed, 'images');
                 hasVideo = Object.hasOwn(this.embedRecord, 'video');
-            }
-            else
-            {
+            } else {
                 this.embedRecord = this.record.embed;
             }
-            if(hasImage)
-            {
+            if (hasImage) {
                 this.images = this.embed?.images;
-            }
-            else if (hasVideo)
-            {
+            } else if (hasVideo) {
                 this.video = this.record?.embed?.video;
-            }
-            else if(Object.hasOwn(this.embed, 'external'))
-            {
+            } else if (Object.hasOwn(this.embed, 'external')) {
                 this.embedExternal = this.embed.external;
             }
         }
-        if(!BSKYUser.cache.has(this.DID))
-        {
+        if (!BSKYUser.cache.has(this.DID)) {
             this.userData = new BSKYUser(this.DID, this.Handle);
             BSKYUser.cache.set(this.DID, this.userData);
             newUserCache.set(this.DID, this.userData);
             this.userData.posts.set(this.postID, this);
-        }
-        else
-        {
+        } else {
             this.userData = BSKYUser.cache.get(this.DID);
-            if(!this.userData.posts.has(this.postID)) { this.userData.posts.set(this.postID, this); }
+            if (!this.userData.posts.has(this.postID)) {
+                this.userData.posts.set(this.postID, this);
+            }
         }
     }
 }
 
-
-class BSKYUser
-{
+class BSKYUser{
     static cache = new Map();
     static handleCache = new Map();
 
@@ -545,51 +545,47 @@ class BSKYUser
     handle = null;
     posts = new Map();
 
-    get following()
-    {
-        if(this.did == myDID) {
+    get following() {
+        if (this.did == myDID) {
             this.following_state = 0;
-            return 1; }
+            return 1;
+        }
         return this.following_state;
     }
 
-    constructor(srcDID, srcHandle)
-    {
+    constructor(srcDID, srcHandle) {
         this.did = srcDID;
         this.handle = srcHandle;
-        if(!BSKYUser.handleCache.has(srcDID))
-        {
+        if (!BSKYUser.handleCache.has(srcDID)) {
             BSKYUser.handleCache.set(srcDID, srcHandle);
         }
     }
 
-    setFollowing(followState)
-    {
-        if(followState != this.following_state)
-        {
+    setFollowing(followState) {
+        if (followState != this.following_state) {
             this.following_state = followState;
-            this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged", {detail:{isFollowing: this.following} } ));
+            this.onFollowingChanged.dispatchEvent(new CustomEvent("followchanged", {
+                    detail: {
+                        isFollowing: this.following
+                    }
+                }));
         }
     }
 
-    listenForFollowChange(callbackMethod)
-    {
+    listenForFollowChange(callbackMethod) {
         this.onFollowingChanged.addEventListener("followchanged", callbackMethod);
     }
 
-    static findPostFromImage(imgURL)
-    {
+    static findPostFromImage(imgURL) {
         let parts = imgURL.split('/img/').at(-1).split('/');
         let DID = parts.at(-2);
         let imgKey = parts.at(-1);
         let user = BSKYUser.cache.get(DID);
 
-        if(user)
-        {
-            for(const post of user.posts.values())
-            {
+        if (user) {
+            for (const post of user.posts.values()) {
                 let postData = post.tryGetPostDataForFullScreen(imgKey);
-                if(postData) {
+                if (postData) {
                     return postData;
                 }
             }
@@ -597,28 +593,23 @@ class BSKYUser
         return null;
     }
 
-    static getHandleFromDID(did)
-    {
+    static getHandleFromDID(did) {
         return BSKYUser.handleCache.get(did);
     }
 
-    static async updateNewAddsFollowState(newUserCache)
-    {
+    static async updateNewAddsFollowState(newUserCache) {
         const addCnt = newUserCache.size;
-        if(addCnt > 0 && newUserCache)
-        {
+        if (addCnt > 0 && newUserCache) {
             const keyz = newUserCache.keys();
             const dids = Array.from(keyz);
-            for(let k = 0; k < addCnt; k+=30)
-            {
+            for (let k = 0; k < addCnt; k += 30) {
                 const end = k + Math.min(30, addCnt - k);
                 const subset = dids.slice(k, end);
                 const usersQuery = subset.join('&others=');
 
                 let relationships = await getRelationships(usersQuery);
-                if(relationships)
-                {
-                    relationships.forEach((relationship)=>{
+                if (relationships) {
+                    relationships.forEach((relationship) => {
                         newUserCache.get(relationship.did).setFollowing(relationship?.following ? 1 : 0);
                     });
                 }
@@ -628,107 +619,103 @@ class BSKYUser
     }
 }
 
-
-
 /*** PROCESSING ***/
-async function processFeedItem(feedItem)
-{
+async function processFeedItem(feedItem) {
     let feedPost = await awaitElem(feedItem, 'div[role="link"][data-testid^="feedItem-"],div[role="link"][data-testid^="postThreadItem-"],div[data-testid^="postThreadItem-"]:has(div[role="link"]),div[role="link"]', argsChildAndSub);
-    if(feedPost == null || hasPostProcessed(feedPost)) { return; }
+    if (feedPost == null || hasPostProcessed(feedPost)) {
+        return;
+    }
     var url = "";
 
-    if(feedPost.hasAttribute("role") && feedPost.role == "link")
-    {
+    if (feedPost.hasAttribute("role") && feedPost.role == "link") {
         let link = await awaitElem(feedPost, 'a[role="link"][href*="/profile/"][href*="/post/"]', argsChildAndSub);
         url = link.href;
+    } else {
+        url = unsafeWindow.location.href;
     }
-    else { url = unsafeWindow.location.href; }
 
     let urlParts = url.split('profile/').at(-1).split('/post/');
     let handle = urlParts[0];
     let postID = urlParts[1];
-    if(handle.startsWith('did:'))
-    {
+    if (handle.startsWith('did:')) {
         handle = BSKYUser.getHandleFromDID(handle);
     }
     let cacheKey = handle + '/' + postID;
     let cachedPost = BSKYPost.cache.get(cacheKey);
 
-    if(cachedPost)
-    {
+    if (cachedPost) {
         cachedPost.link = url;
         await cachedPost.processPostElement(feedPost);
     }
 }
 
-function onFeedItemsAdded(addItems)
-{
-    if (addItems.length == 0) { return; }
+function onFeedItemsAdded(addItems) {
+    if (addItems.length == 0) {
+        return;
+    }
     addItems.forEach(processFeedItem);
 }
 
-function setupFeedWatch(feedElem)
-{
-    if(!hasCustomListener(feedElem))
-    {
+function setupFeedWatch(feedElem) {
+    if (!hasCustomListener(feedElem)) {
         onFeedItemsAdded(feedElem.childNodes);
-        watchForAddedNodes(feedElem, false, { attributes: false, childList: true }, onFeedItemsAdded);
+        watchForAddedNodes(feedElem, false, {
+            attributes: false,
+            childList: true
+        }, onFeedItemsAdded);
     }
 }
 
-async function setupScreenWatch(screenElem)
-{
-    if(hasCustomListener(screenElem)){ return; }
+async function setupScreenWatch(screenElem) {
+    if (hasCustomListener(screenElem)) {
+        return;
+    }
 
     let flatlist = await awaitElem(screenElem, '[data-testid$="eed-flatlist"] > div[style*="removed-body-scroll"] > div', argsChildAndSub);
     let feeds = screenElem.querySelectorAll('[data-testid$="eed-flatlist"] > div[style*="removed-body-scroll"] > div');
     feeds.forEach(setupFeedWatch);
 }
 
-async function checkPanel(panel)
-{
-    if(panel.firstElementChild.tagName == 'BUTTON')
-    {
+async function checkPanel(panel) {
+    if (panel.firstElementChild.tagName == 'BUTTON') {
         let img = await awaitElem(panel.firstElementChild, 'IMG[src*="/img/"]', argsChildAndSub);
-        if(img)
-        {
+        if (img) {
             let postData = BSKYUser.findPostFromImage(img.src);
-            if(postData != null)
-            {
+            if (postData != null) {
                 postData.post.setupFullscreenImageContext(img);
             }
         }
     }
 }
 
-function onPanelsAdded(addItems)
-{
-    if (addItems.length == 0) { return; }
+function onPanelsAdded(addItems) {
+    if (addItems.length == 0) {
+        return;
+    }
     addItems.forEach(checkPanel);
 }
 
-var useLikesList = false;
 
-function processProfileTabs(profileScreen)
-{
+function processProfileTabs(profileScreen) {
     let tabList = profileScreen.querySelector('div[role="tablist"][data-testid="profilePager"] div[data-testid="profilePager-selector"]');
 
-    if(tabList == null || addHasModified(tabList)) { return; }
+    if (tabList == null || addHasModified(tabList)) {
+        return;
+    }
     let personalLikesTab = tabList.querySelector('div[data-testid="profilePager-Likes"]');
-    if(personalLikesTab) { return; }
+    if (personalLikesTab) {
+        return;
+    }
     let repliesTab = tabList.querySelector('div[data-testid="profilePager-selector-1"]');
     let postsTab = tabList.querySelector('div[data-testid="profilePager-selector-0"]');
 
-    if(repliesTab)
-    {
+    if (repliesTab) {
         let tabs = tabList.querySelectorAll('div[role="tablist"] div[data-testid^="profilePager-sel"]');
-        for(let t = 0; t < tabs.length; t++)
-        {
+        for (let t = 0; t < tabs.length; t++) {
             let tab = tabs[t];
             let tabBottom = tab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
 
-            if(tabBottom && tabBottom?.style)
-            {
+            if (tabBottom && tabBottom?.style) {
                 let bottomTabColor = tabBottom.style.backgroundColor;
                 let selTextColor = tabBottom.parentElement.style.color;
 
@@ -740,9 +727,8 @@ function processProfileTabs(profileScreen)
 
         }
 
-
         let likesTab = repliesTab.cloneNode(true);
-        likesTab.setAttribute('data-testid','profilePager-selector-25');
+        likesTab.setAttribute('data-testid', 'profilePager-selector-25');
         let likesBottom = likesTab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
         let likesBottomHolder = likesBottom.parentElement;
 
@@ -751,49 +737,50 @@ function processProfileTabs(profileScreen)
         likesTab.appendChild(likesBottom);
         likesBottomHolder.innerText = "Likes";
         likesBottomHolder.appendChild(likesBottom);
-        likesBottomHolder.setAttribute('data-testid','profilePager-Likes');
+        likesBottomHolder.setAttribute('data-testid', 'profilePager-Likes');
         let repliesBottom = repliesTab.firstElementChild.querySelector('div[data-testid^="profilePager-Replies"] > div');
         let repliesBottomHolder = repliesBottom.parentElement;
 
         repliesTab.after(likesTab);
 
-
-        likesTab.addEventListener('click', function(e) {
-            useLikesList = true;
+        likesTab.addEventListener('click', function (e) {
+            w.stateProps.useLikesList = true;
             repliesTab.click();
-            useLikesList = true;
-            addClassName(likesBottomHolder,"bskyEN-tabtext-on");
-            addClassName(likesBottom,"bskyEN-tab-on");
-            addClassName(repliesBottom,"bskyEN-tab-off");
-            addClassName(repliesBottomHolder,"bskyEN-tabtext-off");
+            w.stateProps.useLikesList = true;
+            addClassName(likesBottomHolder, "bskyEN-tabtext-on");
+            addClassName(likesBottom, "bskyEN-tab-on");
+            addClassName(repliesBottom, "bskyEN-tab-off");
+            addClassName(repliesBottomHolder, "bskyEN-tabtext-off");
         });
         //Cleanup our custom styling
-        tabs.forEach((tab)=>{
-            tab.addEventListener('click',function(e) {
-                removeClassName(likesBottom,"bskyEN-tab-on");
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', function (e) {
+                removeClassName(likesBottom, "bskyEN-tab-on");
                 removeClassName(likesBottomHolder, "bskyEN-tabtext-on");
                 removeClassName(repliesBottomHolder, "bskyEN-tabtext-off");
-                removeClassName(repliesBottom,"bskyEN-tab-off");
+                removeClassName(repliesBottom, "bskyEN-tab-off");
             });
         });
 
-        repliesTab.addEventListener('click', (e)=> {
-            useLikesList = false;
+        repliesTab.addEventListener('click', (e) => {
+            w.stateProps.useLikesList = false;
         });
     }
 }
 
-async function onNewPageLoaded()
-{
-    useLikesList = false;
+async function onNewPageLoaded() {
+    w.stateProps.useLikesList = false;
     let root = await awaitElem(document, 'body #root main', argsChildAndSub);
     let panelsRoot = root.parentElement;
-    if(!addHasModified(panelsRoot)) {
+    if (!addHasModified(panelsRoot)) {
         onPanelsAdded(panelsRoot.childNodes);
-        watchForAddedNodes(panelsRoot, false, { attributes: false, childList: true }, onPanelsAdded);
+        watchForAddedNodes(panelsRoot, false, {
+            attributes: false,
+            childList: true
+        }, onPanelsAdded);
     }
 
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(async (profileScreen) => {
+    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(async(profileScreen) => {
         await setupScreenWatch(profileScreen);
         processProfileTabs(profileScreen);
     });
@@ -804,27 +791,24 @@ async function onNewPageLoaded()
     awaitElem(root, 'div[style*="display: flex"]:has(div[style*="removed-body-scroll"] div[role="tablist"]) div[style*="removed-body-scroll"]:has(a[href^="/profile/"]) > div', argsChildAndSub).then(setupFeedWatch);
 }
 
-async function tryProcessFeedData(response)
-{
-   // let json = await response.json();
+async function tryProcessFeedData(response) {
+    // let json = await response.json();
     let json = response;
-    if(json == null) { return; }
+    if (json == null) {
+        return;
+    }
 
     let posts = json?.posts ?? json?.feed;
 
-    if(posts != null)
-    {
+    if (posts != null) {
         // We make a new one each time instead of global in case multiple feed processes happen before the response of relationship data for users comes back, otherwise data will change mid-processing
         let newUsersCache = new Map();
 
-        for(let i = 0; i < posts.length; i++)
-        {
-           BSKYPost.TryCreateNew(posts[i], newUsersCache) ;
+        for (let i = 0; i < posts.length; i++) {
+            BSKYPost.TryCreateNew(posts[i], newUsersCache);
         }
         await BSKYUser.updateNewAddsFollowState(newUsersCache);
-    }
-    else if(json?.thread != null && json.thread?.post)
-    {
+    } else if (json?.thread != null && json.thread?.post) {
         let newUsersCache = new Map();
 
         BSKYPost.TryCreateNew(json.thread, newUsersCache);
@@ -832,14 +816,14 @@ async function tryProcessFeedData(response)
     }
 }
 
-function getTagFacet(hashtag, start, end)
-{
+function getTagFacet(hashtag, start, end) {
     return {
         "$type": "app.bsky.richtext.facet",
         "features": [{
-            "$type": "app.bsky.richtext.facet#tag",
-            "tag": hashtag
-        }],
+                "$type": "app.bsky.richtext.facet#tag",
+                "tag": hashtag
+            }
+        ],
         "index": {
             "byteEnd": end,
             "byteStart": start
@@ -847,24 +831,19 @@ function getTagFacet(hashtag, start, end)
     };
 }
 
-function modifyTagsText(json)
-{
+function modifyTagsText(json) {
     let posts = json?.posts ?? json?.feed;
-    if(posts && posts.length > 0)
-    {
+    if (posts && posts.length > 0) {
         let usesPostKey = Object.hasOwn(posts[0], 'post');
-        for(let i = 0; i < posts.length; i++)
-        {
+        for (let i = 0; i < posts.length; i++) {
             let rec = usesPostKey ? posts[i].post.record : posts[i].record;
             let textLen = byteLengthCharCode(rec.text);
             let txt = rec.text;
 
-            if(rec?.tags && rec.tags.length > 0)
-            {
+            if (rec?.tags && rec.tags.length > 0) {
                 textLen += 1;
                 txt += '\n';
-                for(let x = 0; x < rec.tags.length; x++)
-                {
+                for (let x = 0; x < rec.tags.length; x++) {
                     let tag = rec.tags[x];
                     let start = textLen;
                     textLen += tag.length + 1;
@@ -883,8 +862,7 @@ function modifyTagsText(json)
 /*** UTILITIES ***/
 async function getUserDID(username) {
     let resp = fetch(`https://bsky.social/xrpc/com.atproto.identity.resolveHandle?handle=${username}`);
-    if(resp && resp.ok)
-    {
+    if (resp && resp.ok) {
         let data = await resp.json();
         return data.did;
     }
@@ -892,44 +870,57 @@ async function getUserDID(username) {
     return null;
 }
 
-function hasCustomListener(elem) { return addHasAttribute(elem, "bskyENListener"); }
+function hasCustomListener(elem) {
+    return addHasAttribute(elem, "bskyENListener");
+}
 
-function hasPostProcessed(post) { return addHasAttribute(post, "bskyENPost"); }
+function hasPostProcessed(post) {
+    return addHasAttribute(post, "bskyENPost");
+}
 
-function addHasModified(elem) { return addHasAttribute(elem, "bskyEN-modified"); }
+function addHasModified(elem) {
+    return addHasAttribute(elem, "bskyEN-modified");
+}
 
-async function getFollowStatus(did)
-{
+async function getFollowStatus(did) {
     try {
         let resp = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getRelationships?actor=${myDID}&others=${did}`);
 
-        if(!resp.ok) { return false; }
+        if (!resp.ok) {
+            return false;
+        }
 
         const data = await resp.json();
-        if(data?.vierelationships?.[0]?.following != null) { return true; }
+        if (data?.vierelationships?.[0]?.following != null) {
+            return true;
+        }
 
-    } catch(e) { return false; }
+    } catch (e) {
+        return false;
+    }
 
     return false;
 }
 
-async function getRelationships(others)
-{
+async function getRelationships(others) {
     try {
         let resp = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.graph.getRelationships?actor=${myDID}&others=${others}`);
 
-        if(!resp.ok) { return null; }
+        if (!resp.ok) {
+            return null;
+        }
 
         const data = await resp.json();
         return data?.relationships;
 
-    } catch(e) { return null; }
+    } catch (e) {
+        return null;
+    }
 
     return null;
 }
 
-function getHashtagElem(hashtag, radix)
-{
+function getHashtagElem(hashtag, radix) {
     return `<a href="/hashtag/${hashtag}" aria-expanded="false" aria-haspopup="menu" aria-label="Hashtag ${hashtag}" role="link" data-no-underline="1" class="css-1jxf684 r-1loqt21" id="radix-:r${radix}:" style="font-size: 15px;
     letter-spacing: 0px; color: rgb(32, 139, 254); line-height: 20px; flex: 1 1 0%; font-family: InterVariable, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI";, Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"; font-variant: no-contextual;">
     <span class="css-1jxf684">#${hashtag}</span></a>`;
@@ -937,39 +928,38 @@ function getHashtagElem(hashtag, radix)
 
 // Thanks to `https://github.com/FerroEduardo/bskyx` for this nifty little API call info
 function getSourceURL(authorDid, videoCid) {
-  const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
-  return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
+    const randomNumber = Math.floor(Math.random() * 100); // Prevent Discord ban/rate limit video
+    return `https://bsky.social/xrpc/com.atproto.sync.getBlob?did=${authorDid}&cid=${videoCid}&r=${randomNumber}`;
 }
 
-function formatFilenameDate(date)
-{
-    date = date.replace(' at',',');
+function formatFilenameDate(date) {
+    date = date.replace(' at', ',');
     let isoDate = new Date(date);
     return isoDate.toISOString("YYYY-MM-DD").split('T')[0];
 }
 
 // returns the byte length of an utf8 string
-function byteLengthCharCode(str)
-{
-  var s = str.length;
-  for (var i = str.length-1; i >= 0; i--)
-  {
-    var code = str.charCodeAt(i);
-    if (code > 0x7f && code <= 0x7ff) s++;
-    else if (code > 0x7ff && code <= 0xffff) s+=2;
-    if (code >= 0xDC00 && code <= 0xDFFF) i--; //trail surrogate
-    else if(i > 0 && str[i] == 'n' && str[i - 1] == '\\') s-=1; // New-line is string formatted, but becomes single byte later
-  }
-  return s;
+function byteLengthCharCode(str) {
+    var s = str.length;
+    for (var i = str.length - 1; i >= 0; i--) {
+        var code = str.charCodeAt(i);
+        if (code > 0x7f && code <= 0x7ff)
+            s++;
+        else if (code > 0x7ff && code <= 0xffff)
+            s += 2;
+        if (code >= 0xDC00 && code <= 0xDFFF)
+            i--; //trail surrogate
+        else if (i > 0 && str[i] == 'n' && str[i - 1] == '\\')
+            s -= 1; // New-line is string formatted, but becomes single byte later
+    }
+    return s;
 }
 
-function removeClassName(elem, className)
-{
+function removeClassName(elem, className) {
     elem.classList.remove(className);
 }
 
-function addClassName(elem, className)
-{
+function addClassName(elem, className) {
     elem.classList.add(className);
 }
 
@@ -986,8 +976,7 @@ var ctxMenuCopyVidAddress;
 var ctxMenuGRIS;
 var ctxMenuShowDefault;
 
-function initializeCtxMenu()
-{
+function initializeCtxMenu() {
     ctxMenu = document.createElement('div');
     ctxMenu.style.zIndex = "500";
     ctxMenu.id = "contextMenu";
@@ -997,8 +986,7 @@ function initializeCtxMenu()
 
     ctxMenuOpenInNewTab = createCtxMenuItem(ctxMenuList, "Open Image in New Tab");
     ctxMenuOpenVidInNewTab = createCtxMenuItem(ctxMenuList, "Open Video in New Tab");
-    if(is_chrome)
-    {
+    if (is_chrome) {
         let hideElem = document.createElement('div');
         ctxMenuOpenVidInNewTab.style.display = "none";
         hideElem.appendChild(ctxMenuOpenVidInNewTab);
@@ -1013,78 +1001,63 @@ function initializeCtxMenu()
     ctxMenuShowDefault = createCtxMenuItem(ctxMenuList, "Show Default Context Menu");
 
     document.body.appendChild(ctxMenu);
-    document.body.addEventListener('click', function (e) { setContextMenuVisible(false); });
+    document.body.addEventListener('click', function (e) {
+        setContextMenuVisible(false);
+    });
 
     setContextMenuVisible(false);
 
     window.addEventListener('locationchange', function () {
         setContextMenuVisible(false);
     });
-    window.addEventListener('popstate',() => {
+    window.addEventListener('popstate', () => {
         setContextMenuVisible(false);
     });
 }
 
-function createCtxMenuItem(menuList, text)
-{
+function createCtxMenuItem(menuList, text) {
     let menuItem = document.createElement('LI');
     menuItem.innerText = text;
     menuList.appendChild(menuItem);
     return menuItem;
 }
 
-function mouseX(evt)
-{
-    if (evt.pageX)
-    {
+function mouseX(evt) {
+    if (evt.pageX) {
         return evt.pageX;
-    }
-    else if (evt.clientX)
-    {
+    } else if (evt.clientX) {
         return evt.clientX + (document.documentElement.scrollLeft ?
             document.documentElement.scrollLeft :
             document.body.scrollLeft);
-    }
-    else
-    {
+    } else {
         return null;
     }
 }
 
-function mouseY(evt)
-{
-    if (evt.pageY)
-    {
+function mouseY(evt) {
+    if (evt.pageY) {
         return evt.pageY;
-    }
-    else if (evt.clientY)
-    {
+    } else if (evt.clientY) {
         return evt.clientY + (document.documentElement.scrollTop ?
             document.documentElement.scrollTop :
             document.body.scrollTop);
-    }
-    else
-    {
+    } else {
         return null;
     }
 }
 
-function setContextMenuVisible(visible)
-{
+function setContextMenuVisible(visible) {
     ctxMenu.style.display = visible ? "block" : "none";
 }
 
 var selectedShowDefaultContext = false;
 //To avoid the value being captured when setting up the event listeners.
-function wasShowDefaultContextClicked()
-{
+function wasShowDefaultContextClicked() {
     return selectedShowDefaultContext;
 }
 
-class SelectionCtx
-{
-    constructor(postData, targetElem, isImage, isVideo, vidElem = null)
-    {
+class SelectionCtx{
+    constructor(postData, targetElem, isImage, isVideo, vidElem = null) {
         this.postData = postData;
         this.targetElem = targetElem;
         this.isImage = isImage;
@@ -1092,20 +1065,19 @@ class SelectionCtx
         this.vidElem = vidElem;
     }
 
-    get VideoSource()
-    {
+    get VideoSource() {
         return this.postData.VideoSource;
     }
 
-    get ImageData()
-    {
+    get ImageData() {
         return this.postData.getImageDataFromURL(this.targetElem.src);
     }
 }
 
-async function updateContextMenuLink(selContext)
-{
-    if(selContext == null) { return; }
+async function updateContextMenuLink(selContext) {
+    if (selContext == null) {
+        return;
+    }
 
     ctxMenu.setAttribute('selection', selContext);
 
@@ -1124,253 +1096,365 @@ async function updateContextMenuLink(selContext)
     ctxMenuSaveAsVid.style.display = vidVisibility;
     ctxMenuCopyVidAddress.style.display = vidVisibility;
 
-    const copyAddress = function(url){ setContextMenuVisible(false); navigator.clipboard.writeText(url); };
-    const openInNewTab = function(url)
-    {
+    const copyAddress = function (url) {
         setContextMenuVisible(false);
-        if (GM_OpenInTabMissing)
-        {
+        navigator.clipboard.writeText(url);
+    };
+    const openInNewTab = function (url) {
+        setContextMenuVisible(false);
+        if (GM_OpenInTabMissing) {
             let lastWin = unsafeWindow;
             unsafeWindow.open(url, '_blank');
             lastWin.focus();
+        } else {
+            GM_openInTab(url, {
+                active: false,
+                insert: true,
+                setParent: true,
+                incognito: false
+            });
         }
-        else { GM_openInTab(url, { active: false, insert: true, setParent: true, incognito: false }); }
     };
 
-
     //Image Context
-    if(isImage == true)
-    {
+    if (isImage == true) {
         ctxMenuOpenInNewTab.onclick = () => {
-            openInNewTab(selContext.ImageData.urlSRC); };
+            openInNewTab(selContext.ImageData.urlSRC);
+        };
         ctxMenuSaveAs.onclick = () => {
             setContextMenuVisible(false);
             selContext.postData.downloadImageClicked(selContext.targetElem.src);
         };
 
-        ctxMenuCopyImg.onclick = async () =>
-        {
+        ctxMenuCopyImg.onclick = async() => {
             setContextMenuVisible(false);
-            try
-            {
+            try {
                 GM.xmlHttpRequest({
                     method: 'GET',
                     url: selContext.ImageData.urlSRC,
                     responseType: 'blob',
-                    onload: ({ status, response }) => {
-                        if (status !== 200) return void alert(`Error loading: ${url}`);
+                    onload: ({
+                        status,
+                        response
+                    }) => {
+                        if (status !== 200) {
+                            return void alert(`Error loading: ${selContext.ImageData.urlSR}`);
+                        }
                         let imgBlob = unsafeWindow.URL.createObjectURL(response);
 
                         let c = document.createElement('canvas');
                         var img = new Image();
                         var ctx = c.getContext('2d');
-                        img.onload = async function()
-                        {
+                        img.onload = async function () {
                             c.width = img.width;
                             c.height = img.height;
                             ctx.drawImage(img, 0, 0);
-                            c.toBlob((png) =>
-                                     {
+                            c.toBlob((png) => {
                                 navigator.clipboard.write([new ClipboardItem({
-                                    [png.type]: png })]);
+                                            [png.type]: png
+                                        })]);
                             }, "image/png", 1);
                         };
                         img.src = imgBlob;
                     },
                 });
-            }
-            catch (err) { console.log(err); };
+            } catch (err) {
+                console.log(err);
+            };
         };
-        ctxMenuCopyAddress.onclick = (e) => { copyAddress(selContext.ImageData.urlSRC); };
+        ctxMenuCopyAddress.onclick = (e) => {
+            copyAddress(selContext.ImageData.urlSRC);
+        };
         ctxMenuGRIS.onclick = () => {
             setContextMenuVisible(false);
             unsafeWindow.open("https://www.google.com/searchbyimage?sbisrc=cr_1_5_2&image_url=" + selContext.ImageData.url);
         };
-    }
-    else //Video
+    } else //Video
     {
-        ctxMenuOpenVidInNewTab.onclick = () => { openInNewTab(selContext.VideoSource); };
-        if(!selContext.targetElem.hasAttribute("downloading"))
-        {
-            ctxMenuSaveAsVid.onclick = async () =>
-            {
-                selContext.targetElem.setAttribute("downloading","");
+        ctxMenuOpenVidInNewTab.onclick = () => {
+            openInNewTab(selContext.VideoSource);
+        };
+        if (!selContext.targetElem.hasAttribute("downloading")) {
+            ctxMenuSaveAsVid.onclick = async() => {
+                selContext.targetElem.setAttribute("downloading", "");
                 setContextMenuVisible(false);
                 await selContext.postData.downloadVideoButtonClicked();
                 selContext.targetElem.removeAttribute("downloading");
             };
-        } else { ctxMenuSaveAsVid.style.display = "none"; }
+        } else {
+            ctxMenuSaveAsVid.style.display = "none";
+        }
 
-        ctxMenuCopyVidAddress.onclick = () => { copyAddress(selContext.postData.VideoSource) };
+        ctxMenuCopyVidAddress.onclick = () => {
+            copyAddress(selContext.postData.VideoSource)
+        };
     }
 
     //Generic Stuff
-    ctxMenuShowDefault.onclick = () => { selectedShowDefaultContext = true;
-        setContextMenuVisible(false); };
+    ctxMenuShowDefault.onclick = () => {
+        selectedShowDefaultContext = true;
+        setContextMenuVisible(false);
+    };
 }
 
-function addCustomCtxMenu(selContext)
-{
-    if (addHasAttribute(selContext.targetElem, "bskyEN_customctx")) { return; }
+function addCustomCtxMenu(selContext) {
+    if (addHasAttribute(selContext.targetElem, "bskyEN_customctx")) {
+        return;
+    }
 
-    selContext.targetElem.addEventListener('contextmenu', function (e)
-    {
+    selContext.targetElem.addEventListener('contextmenu', function (e) {
         e.stopPropagation();
 
         let curSel = ctxMenu.getAttribute('selection');
 
-        if (wasShowDefaultContextClicked())
-        { //Skip everything here and show default context menu
+        if (wasShowDefaultContextClicked()) { //Skip everything here and show default context menu
             selectedShowDefaultContext = false;
             return;
         }
 
         e.preventDefault();
 
-        if(ctxMenu.style.display != "block" || (curSel == null || (curSel != null && curSel != selContext)))
-        {
+        if (ctxMenu.style.display != "block" || (curSel == null || (curSel != null && curSel != selContext))) {
             updateContextMenuLink(selContext);
             setContextMenuVisible(true);
             ctxMenu.style.left = -12.0 + mouseX(e) + "px";
             ctxMenu.style.top = -10.0 + mouseY(e) + "px";
+        } else {
+            setContextMenuVisible(false);
         }
-        else { setContextMenuVisible(false); }
 
-    }, {capture: true}, true);
+    }, {
+        capture: true
+    }, true);
 }
 
-
 /*** OVERRIDES ***/
-const { fetch: originalFetch } = unsafeWindow;
 
-async function checkCreateRecordForFollow(record)
-{
-    if(record && record?.record && record.record.$type?.includes('graph.follow'))
-    {
+
+async function checkCreateRecordForFollow(record) {
+    if (record && record?.record && record.record.$type?.includes('graph.follow')) {
         let did = record.record.subject;
         let cachedUser = BSKYUser.cache.get(did);
-        if(cachedUser) { cachedUser.setFollowing(1); }
+        if (cachedUser) {
+            cachedUser.setFollowing(1);
+        }
     }
 }
 
-async function getLikedPosts(likesRec, feedObj)
-{
+async function getLikedPosts(likesRec, container) {
     let likeQuery = encodeURIComponent(likesRec.records[0].value.subject.uri);
-    for(let i = 1; i < likesRec.records.length; i++)
-    {
+    for (let i = 1; i < likesRec.records.length; i++) {
         likeQuery += '&uris=' + encodeURIComponent(likesRec.records[i].value.subject.uri);
     }
 
     likeQuery = 'https://bsky.social/xrpc/app.bsky.feed.getPosts?uris=' + likeQuery;
-    const likePostsResp = await fetch(likeQuery,
-                                      {
+    const likePostsResp = await originalFetch(likeQuery, {
         "headers": {
             "accept": '*//*',
-            "accept-encoding":"gzip, deflate, br, zstd",
+            "accept-encoding": "gzip, deflate, br, zstd",
             "accept-language": "en-US,en;q=0.9",
-            "authorization": bear,
+            "authorization": container.bear,
         },
         "body": null,
-        "origin":"https://bsky.app",
-        "referer":"https://bsky.app/",
+        "origin": "https://bsky.app",
+        "referer": "https://bsky.app/",
         "method": "GET",
         "mode": "cors"
     });
-    let likedPosts = await likePostsResp.json();
-    let removedCnt = 0;
-    let postCnt = likedPosts.posts.length;
+  if(likePostsResp.ok)
+  {
+      let likedPosts = await likePostsResp.json();
+      let removedCnt = 0;
 
-    for(let p = 0; p < postCnt; p++)
+    console.log(likedPosts);
+    let postCnt = likedPosts.posts.length;
+    let posts = [];
+    for (let p = 0; p < postCnt; p++)
     {
-        if(removedCnt > (postCnt - 2) || Object.hasOwn(likedPosts.posts[p],'embed'))
-        {
-            feedObj.feed.push({post:likedPosts.posts[p]});
-       } else { removedCnt += 1;}
+      if (removedCnt > (postCnt - 2) || Object.hasOwn(likedPosts.posts[p], 'embed'))
+      {
+          posts.push({post: likedPosts.posts[p]});
+      }
+      else
+      {
+          removedCnt += 1;
+      }
     }
+    container.newPosts = posts;
+    console.log("found liked posts");
+    console.log(posts);
+   // return posts;
+    
+  } else { console.log("failed likes get");}
+  
+ // return [];
 }
 
-var lastCursor = "";
 
-unsafeWindow.fetch = exportFunction(async (...args) => {
-    let [resource, config] = args;
+async function fetchPreReact(ref, resource, config)
+{
+	ref.isGetSession = (resource?.constructor === URL && resource.href.includes('server.getSession'));
+	ref.isRequest = resource?.constructor === Request;
 
-    let isGetSession = (resource?.constructor === URL && resource.href.includes('server.getSession'));
-    let isRequest = resource?.constructor === Request;
+	if (!ref.isGetSession && ref.isRequest && resource.url.includes('repo.createRecord')) {
+		resource.clone().json().then(checkCreateRecordForFollow);
+	}
+	if (ref.isGetSession) {
+    console.log("get session");
+    console.log(config?.headers);
+		if (config?.headers?.has("authorization")) {
+			console.log("get bear");
+			let bearing = config?.headers?.get("authorization");
+			//window.stateProps.bear = bearing;
+			console.log(bearing);
+			window.stateProps.bear = bearing;
+		}
+	} 
+  else if (window.stateProps.useLikesList === true && ref.isRequest && resource.url.includes('.getAuthorFeed?') && resource.url.includes('=posts_with_replies'))
+  {
+    console.log("use likes list");
+		let did = resource.url.split('actor=').at(-1).split('&')[0];
 
-    if(!isGetSession && isRequest && resource.url.includes('repo.createRecord'))
+		let cursor = "";
+		if (!resource.url.includes('cursor=')) {
+			window.stateProps.lastCursor = "";
+		}
+
+		let feedObj = {
+			feed: []
+		};
+    window.stateProps.likeFeed = feedObj;
+		let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&filter=posts_with_media&reverse=false&cursor=${window.stateProps.lastCursor}&repo=${did}`, resource);
+		const likesRecResp = await originalFetch(likesRecReq, config);
+		let likesRec = await likesRecResp.json();
+		if (likesRec)
     {
-        resource.clone().json().then(checkCreateRecordForFollow);
-    }
-    if(isGetSession)
-    {
-        if(config?.headers?.has("authorization"))
-        {
-            bear = config?.headers?.get("authorization");
-        }
-    }
-    else if(useLikesList === true && isRequest && resource.url.includes('.getAuthorFeed?') && resource.url.includes('=posts_with_replies'))
-    {
-        let did = resource.url.split('actor=').at(-1).split('&')[0];
+			let recordCnt = likesRec.records.length;
+			if (Object.hasOwn(likesRec, 'cursor')) {
+				window.stateProps.lastCursor = likesRec.cursor;
+				feedObj.cursor = window.stateProps.lastCursor;
+			}
+			if (recordCnt > 0) {
+        console.log("get posties");
+				await getLikedPosts(likesRec, window.stateProps);
+        console.log("got postiess");
+        console.log(window.stateProps.newPosts);
+        feedObj.feed = window.stateProps.newPosts;
+				if (feedObj.feed.length > 0) {
+					tryProcessFeedData(feedObj);
+					modifyTagsText(feedObj);
+				}
+			}
+			if (recordCnt < 25) {
+				delete feedObj.cursor;
+			}
+		}
+		ref.response = new Response(JSON.stringify(feedObj), {
+			status: likesRecResp.status,
+			statusText: likesRecResp.statusText,
+			headers: likesRecResp.headers
+		});
+		return true;
+	} else
+  {
+     console.log("skipped likes list");
+  }
+   return false;
+}
 
-        let cursor = "";
-        if(!resource.url.includes('cursor='))
-        {
-            lastCursor = "";
-       }
-
-        let feedObj = {feed:[]};
-        let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&filter=posts_with_media&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
-        const likesRecResp = await originalFetch(likesRecReq, config);
-        let likesRec = await likesRecResp.json();
-        let recordCnt = likesRec.records.length;
-
-        if(recordCnt > 0)
-        {
-            await getLikedPosts(likesRec, feedObj);
-            if(feedObj.feed.length > 0)
-            {
-                if(recordCnt >= 25) {
-                    lastCursor = likesRec.cursor;
-                    feedObj.cursor = likesRec.cursor;
-                }
-
-                tryProcessFeedData(feedObj);
-                modifyTagsText(feedObj);
-
-                return new Response(JSON.stringify(feedObj), {
-                    status: likesRecResp.status,
-                    statusText: likesRecResp.statusText,
-                    headers: likesRecResp.headers
-                });
-            }
-        }
-    }
-
-    const response = await originalFetch(resource, config);
-    if(isGetSession)
-    {
-        var sessionData = await response.clone().json();
-        myDID = sessionData?.did;
-    }
-    else if(isRequest && resource.url.includes('bsky.feed.'))
-    {
-        let json = await response.json();
+async function fetchPostReact(ref, resource, config)
+{
+   if (ref.isGetSession) {
+        var sessionData = await ref.response.clone().json();
+        window.stateProps.did = cloneInto(sessionData?.did, window);
+    } else if (ref.isRequest && resource?.url.includes('bsky.feed.')) {
+        let json = await ref.response.json();
         tryProcessFeedData(json);
         modifyTagsText(json);
 
-        return new Response(JSON.stringify(json), {
+        ref.response = new Response(JSON.stringify(json), {
             status: response.status,
             statusText: response.statusText,
             headers: response.headers
         });
     }
-    return response;
+}
 
-}, unsafeWindow);
+var stateProps = { useLikesList: false, lastCursor: "", bear:"", did:null};
+  var bear = {key:""};
+var bsNet = {};
 
 
-const filterVideoSources = function (m3u8)
-{
+const w = window.wrappedJSObject;
+const windowRef = w != null ? w : unsafeWindow;
+
+
+
+
+if (w) {
+	w.stateProps = stateProps;
+	exportFunction(getLikedPosts, window, {defineAs:"getLikedPosts", allowCrossOriginArguments: true});
+  exportFunction(fetchPreReact, window, {defineAs:"fetchPreReact", allowCrossOriginArguments: true});
+  exportFunction(fetchPostReact, window, {defineAs:"fetchPostReact", allowCrossOriginArguments: true});
+  exportFunction(tryProcessFeedData, window, {defineAs:"tryProcessFeedData", allowCrossOriginArguments: true});
+  exportFunction(getTagFacet, window, {defineAs:"getTagFacet", allowCrossOriginArguments: true});
+  exportFunction(modifyTagsText, window, {defineAs:"modifyTagsText", allowCrossOriginArguments: true});
+  exportFunction(byteLengthCharCode, window, {defineAs:"byteLengthCharCode", allowCrossOriginArguments: true});
+  exportFunction(checkCreateRecordForFollow, window, {defineAs:"checkCreateRecordForFollow", allowCrossOriginArguments: true});
+  
+  w.eval("window.originalFetch = window.fetch");
+  w.eval(`window.getLikedPosts = ${getLikedPosts}`);
+  //w.eval(`window.tryProcessFeedData = ${tryProcessFeedData}`);
+  //w.eval(`window.getTagFacet = ${getTagFacet}`);
+ // w.eval(`window.modifyTagsText = ${modifyTagsText}`);
+//  w.eval(`window.byteLengthCharCode = ${byteLengthCharCode}`);
+//  w.eval(`window.checkCreateRecordForFollow = ${checkCreateRecordForFollow}`);
+  
+  w.eval(`window.fetchPreReact = ${fetchPreReact}`);
+	w.eval(`window.fetchPostReact = ${fetchPostReact}`);
+  w.eval(`window.stateProps = { useLikesList: false, lastCursor: ""}`);
+
+  
+  w.eval(`window.fetch = ${async (...args) => {
+    let [resource, config] = args;
+    
+    this.response = null;
+
+    
+    let preFetch = await window.fetchPreReact(this, resource, config);
+    if(preFetch === true)
+    {
+      console.log("did prefetch");
+   		return this.response;
+    }
+    this.response = await window.originalFetch(resource, config);
+    await window.fetchPostReact(this, resource, config);
+
+    return this.response;
+  }}`);
+} else {
+  const { fetch: originalFetch } = unsafeWindow;
+  var bear = "";
+	unsafeWindow.stateProps = stateProps;
+  unsafeWindow.fetch = async (...args) => {
+    let [resource, config] = args;
+    this.response = null;
+    
+  //  const preFetch = await fetchPreReact(this, resource, config);
+   // if(preFetch === true) { 
+   //      console.log("returned prefetch");
+   //   return this.response;
+  //  }
+    this.response = await originalFetch(resource, config);
+   // await fetchPostReact(this, resource, config);
+
+    return this.response;
+  };
+}
+
+
+
+const filterVideoSources = function (m3u8) {
     const bandwidth_regex = /(?<=,BANDWIDTH=)([0-9]*)(?=,)/gm;
     let bestLine = 0;
     let bestBitrate = 0;
@@ -1378,28 +1462,21 @@ const filterVideoSources = function (m3u8)
 
     let lines = m3u8.split('#');
 
-
-    for (let i = 1; i < lines.length; i++)
-    {
+    for (let i = 1; i < lines.length; i++) {
         let line = lines[i];
 
-        if (line.includes('STREAM-INF:'))
-        {
+        if (line.includes('STREAM-INF:')) {
             let bitrate = parseInt(line.match(bandwidth_regex));
-            if (bitrate > bestBitrate)
-            {
+            if (bitrate > bestBitrate) {
                 bestBitrate = bitrate;
                 bestLine = i;
             }
-        }
-        else
-        {
+        } else {
             new_playlist += '#' + line;
         }
     }
 
-    if (bestLine == 0)
-    {
+    if (bestLine == 0) {
         bestLine = Math.max(0, lines.length - 1);
     }
 
@@ -1408,31 +1485,29 @@ const filterVideoSources = function (m3u8)
     return new_playlist;
 };
 
-function processXMLOpen(thisRef, method, url)
-{
-    thisRef.addEventListener('readystatechange', function (e)
-    {
+function processXMLOpen(thisRef, method, url) {
+    thisRef.addEventListener('readystatechange', function (e) {
         const m3uText = e.target.responseText;
-        if(m3uText.includes('#EXT-X-STREAM-INF'))
-        {
+        if (m3uText.includes('#EXT-X-STREAM-INF')) {
             let m3u = filterVideoSources(m3uText);
-            Object.defineProperty(thisRef, 'response', { writable: true });
-            Object.defineProperty(thisRef, 'responseText', { writable: true });
+            Object.defineProperty(thisRef, 'response', {
+                writable: true
+            });
+            Object.defineProperty(thisRef, 'responseText', {
+                writable: true
+            });
             thisRef.response = thisRef.responseText = m3u;
         }
     });
 }
 
 var openOpen = unsafeWindow.XMLHttpRequest.prototype.open;
-unsafeWindow.XMLHttpRequest.prototype.open = exportFunction(function(method, url)
-{
-    if(url.endsWith('playlist.m3u8'))
-    {
+unsafeWindow.XMLHttpRequest.prototype.open = exportFunction(function (method, url) {
+    if (url.endsWith('playlist.m3u8')) {
         processXMLOpen(this, method, url);
     }
     openOpen.call(this, method, url);
 }, unsafeWindow);
-
 
 /*** EVENTS ***/
 unsafeWindow.addEventListener('locationchange', function () {
@@ -1462,8 +1537,7 @@ unsafeWindow.addEventListener('locationchange', function () {
 })();
 
 /*** ENTRY ***/
-(async function()
- {
+(async function () {
     console.log("start userscript");
     initializeCtxMenu();
 
