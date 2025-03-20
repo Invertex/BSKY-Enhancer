@@ -1,5 +1,6 @@
 # BSKY-Enhancer
-QoL improvements for BSKY, including media download, "Likes" feeds visible, highest-quality playback, attribution in filenames and much more!
+QoL improvements for BSKY, including media download, "Likes" feeds visible, highest-quality playback, attribution in filenames and much more!<br/>
+>A successor to my [Twitter AutoHD](https://github.com/Invertex/Twitter-AutoHD) script, but for BSKY since I've moved :)
 
 ## Installation:
 Install a userscript addon for your browser, preferably [TamperMonkey](https://www.tampermonkey.net/) or ViolentMonkey. <sub>(Will not work with GreaseMonkey*)</sub><br/>
@@ -16,7 +17,8 @@ Then [click here](https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhanc
   - And includes user's "DID" so they can be found even if their Handle/Username changes!
 - Adds a "Copy Link" button below media posts to automatically copy it as a `bskyx.app` link, so the media will embed properly when pasted elsewhere.
 - Hidden "hashtags" show on the post! (other apps like deck.blue can make posts with the tags hidden in data)
-- Not-following status icon on avatars if you don't follow the user. Just like on Mobile!
+- Icon on Avatars to show you're not following them!! Just like on Mobile!
+- Improvents to content layout. Primarily allow single images and video to use more vertical space!
 
 ![](https://i.imgur.com/PylWOw3.png)
 ![](https://i.imgur.com/nv8k9dV.png)
