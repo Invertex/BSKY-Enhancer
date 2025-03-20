@@ -85,13 +85,11 @@ GM_addStyle(`svg.vxDlSVG > path, svg.vxLinkSVG > path  {
     }
 }
 div.bskyIVX_followIcon {
-    position: fixed;
-    width: 1em;
-    height: 1em;
-    size: 10px;
-    align-self: auto;
-    margin-left: 1.6em;
-    margin-top: 1.7em;
+    position: absolute;
+    width: 55%;
+    height: 55%;
+    margin-left: 60%;
+    display: flex;
 }`);
 
 
@@ -153,11 +151,12 @@ const linkSVG = `<svg class="vxLinkSVG vxDlSVG" xmlns="http://www.w3.org/2000/sv
 27.125  c2.375-1.375,4.813-2.5,6.813-4.5l42.063-42.047c-5.375-9.156-11.563-17.969-19.438-25.828c-49.969-49.984-131.031-49.984-181.016,0  l-90.5,90.5c-49.984,50-49.984,131.031,0,181.031c49.984,49.969,131.031,49.969,181.016,0l68.594-68.594  C274.561,395.092,246.42,392.342,220.326,382.186z"/>
 </svg>`;
 
-const followSVG = `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="22" height="22" viewBox="0 0 24 24">
+const followSVG = `<div style="margin-bottom: 10%; height: 100%;">
+<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100%" height="100%" viewBox="0 0 24 24" style="padding-top: 65%;">
 <path d="M12 3A9 9 0 1 0 12 21A9 9 0 1 0 12 3Z" fill="rgb(52 70 91)"></path>
 <path d="M12,22C6.5,22,2,17.5,2,12C2,6.5,6.5,2,12,2c5.5,0,10,4.5,10,10C22,17.5,17.5,22,12,22z M12,4c-4.4,0-8,3.6-8,8 c0,4.4,3.6,8,8,8c4.4,0,8-3.6,8-8C20,7.6,16.4,4,12,4z" fill="rgb(19 19 20)"></path>
 <path d="M11 8H13V16H11z" fill="rgb(117 139 162)"></path><path d="M8 11H16V13H8z" fill="rgb(117 139 162)"></path>
-</svg>`;
+</svg></div>`;
 
 /*** CLASSES ***/
 class BSKYPost
@@ -237,7 +236,7 @@ class BSKYPost
     {
         if(followIcon != null)
         {
-            followIcon.style.display = followStatus.detail.isFollowing === 1 ? "none" : "block";
+            followIcon.style.display = followStatus.detail.isFollowing === 1 ? "none" : "flex";
         }
     }
 
@@ -408,7 +407,7 @@ class BSKYPost
 
         if(this.userData.following == 0)
         {
-            this.followIcon.style.display = "block";
+            this.followIcon.style.display = "flex";
         }
         this.userData.listenForFollowChange((followUpdate)=>{this.updateFollowIcon(this.followIcon, followUpdate)});
 
@@ -1312,38 +1311,41 @@ unsafeWindow.fetch = exportFunction(async (...args) => {
     {
         let did = resource.url.split('actor=').at(-1).split('&')[0];
 
-        let cursor = "";
         if(!resource.url.includes('cursor='))
         {
             lastCursor = "";
-       }
+        }
 
         let feedObj = {feed:[]};
-        let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&filter=posts_with_media&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
+        let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
         const likesRecResp = await originalFetch(likesRecReq, config);
         let likesRec = await likesRecResp.json();
-        let recordCnt = likesRec.records.length;
-
-        if(recordCnt > 0)
+        if(likesRec)
         {
-            await getLikedPosts(likesRec, feedObj);
-            if(feedObj.feed.length > 0)
+            let recordCnt = likesRec.records.length;
+            if(Object.hasOwn(likesRec, 'cursor')) {
+                lastCursor = likesRec.cursor;
+                feedObj.cursor = lastCursor;
+            }
+            if(recordCnt > 0)
             {
-                if(recordCnt >= 25) {
-                    lastCursor = likesRec.cursor;
-                    feedObj.cursor = likesRec.cursor;
+                await getLikedPosts(likesRec, feedObj);
+                if(feedObj.feed.length > 0)
+                {
+                    tryProcessFeedData(feedObj);
+                    modifyTagsText(feedObj);
                 }
-
-                tryProcessFeedData(feedObj);
-                modifyTagsText(feedObj);
-
-                return new Response(JSON.stringify(feedObj), {
-                    status: likesRecResp.status,
-                    statusText: likesRecResp.statusText,
-                    headers: likesRecResp.headers
-                });
+            }
+            if(recordCnt < 25)
+            {
+                delete feedObj.cursor;
             }
         }
+        return new Response(JSON.stringify(feedObj), {
+            status: likesRecResp.status,
+            statusText: likesRecResp.statusText,
+            headers: likesRecResp.headers
+        });
     }
 
     const response = await originalFetch(resource, config);
