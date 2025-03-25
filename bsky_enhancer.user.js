@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BSKY Enhancer
 // @namespace    Invertex.BSKY
-// @version      0.34
+// @version      0.36
 // @description  Quality of life improvements for BSKY
 // @author       Invertex
 // @updateURL    https://github.com/Invertex/BSKY-Enhancer/raw/main/bsky_enhancer.user.js
@@ -126,6 +126,7 @@ div[thd_customctx]:has(video[downloading]) {
 
 :root {
 --bskyEN-tab-on-var: rgb(32, 139, 254) !important;
+--bskyEN-tab-hover-var: rgb(30, 41, 54) !important;
 --bskyEN-tabtext-on-var: rgb(241, 243, 245) !important;
 --bskyEN-tabtext-off-var: rgb(147, 165, 183) !important;
 }
@@ -139,11 +140,28 @@ background-color: var(--bskyEN-tab-on-var) !important;
 .bskyEN-tabtext-on {
 color: var(--bskyEN-tabtext-on-var) !important;
 }
+.bskyEN-tab:hover {
+background-color: var(--bskyEN-tab-hover-var) !important;
+}
 .bskyEN-tabtext-off {
 color: var(--bskyEN-tabtext-off-var) !important;
 }
 .force-column-flex {
 flex-direction: column !important;
+}
+.bskyEN-likesOF {
+ color: rgb(209 209 209 / 30%);
+ background-color: rgb(0 0 0 / 10%);
+ border: 0.1em, solid, rgb(1 1 1 / 41%);
+ border-radius: 6px;
+}
+.bskyEN-likesOF-chrome {
+ color: transparent !important;
+ background-color: transparent !important;
+ border: none !important;
+}
+.bskyEN-likesOF:hover, .bskyEN-likesOF-chrome:hover {
+ background-color: rgb(73 71 107 / 26%) !important;
 }
 `);
 
@@ -214,7 +232,7 @@ class BSKYPost
     {
         if(this.isVideoDownloading) { return; }
         this.setDownloadingState(true);
-        const ext = BSKYPost.extensionFromMimeType(this.record.embed.video.mimeType);
+        const ext = BSKYPost.extensionFromMimeType(this.video.mimeType);
         let filename = `${this.FilenameBase}${ext}`;
         await downloadFile(this.VideoSource, filename, 120000);
         this.setDownloadingState(false);
@@ -356,11 +374,10 @@ class BSKYPost
         if(borderElem)
         {
             let styleParent = borderElem.parentElement;
-            styleParent.style.position = "relative";
-            styleParent.style.maxHeight = "max(90vh, 800px)";
-            styleParent.style.flexDirection = "column";
             styleParent.parentElement.style.paddingTop = 0;
-
+            styleParent.style.aspectRatio = borderElem.style.aspectRatio;
+            styleParent.style.maxHeight = "max(85vh, 700px)";
+            styleParent.style.position = 'relative';
         }
 
         let selContext = new SelectionCtx(this, selTarget, false, true, vidElem);
@@ -394,8 +411,16 @@ class BSKYPost
             let borderElem = imageElemLoaded.closest('div[style*="border-radius:"]');
             if(borderElem)
             {
+		        imageElemLoaded.style.maxHeight = "max(85vh, 700px)";
+                imageElemLoaded.style.position = "relative";
+                imageElemLoaded.style.objectFit = "contain";
+                imageElemLoaded.parentElement.style.display = "flex";
+
                 borderElem.style.height = "inherit";
-                borderElem.style.maxHeight = "max(100vh, 900px)";
+                borderElem.style.aspectRatio = "";
+                borderElem.style.alignItems = "flex-start";
+                borderElem.style.width = "fit-content";
+
                 let parentElem = borderElem.parentElement;
                 addClassName(parentElem, 'force-column-flex')
 
@@ -410,7 +435,7 @@ class BSKYPost
 
             let imgElem = await awaitElem(this.postElem, `img[src*="${imgData.image.ref.$link}"]`, argsChildAndSub);
             let selContext = new SelectionCtx(this, imgElem, true, false);
-            // Force HQ Image. Off for now, may add option in future if I do timeline scaling.
+        // Force HQ Image. Off for now, may add option in future if I do timeline scaling.
         //    imgElem.src = selContext.ImageData.urlSRC;
 
             addCustomCtxMenu(selContext);
@@ -463,10 +488,9 @@ class BSKYPost
                 };
 
                 this.buttonBar.appendChild(this.copyBtn);
-
             }
 
-            if(this.video) {await this.setupVideoElem(); }
+            if(this.video) { await this.setupVideoElem(); }
             else if (this.images != null && this.images.length > 0) { await this.setupImageElems(); }
             else if (this.embedExternal != null) { await this.setupExternalEmbed(); }
         }
@@ -545,9 +569,9 @@ class BSKYPost
             {
                 this.images = this.embed?.images;
             }
-            else if (hasVideo)
+            if (hasVideo)
             {
-                this.video = this.record?.embed?.video;
+                this.video = this?.embedRecord?.video;
             }
             else if(Object.hasOwn(this.embed, 'external'))
             {
@@ -557,7 +581,6 @@ class BSKYPost
         if(!BSKYUser.cache.has(this.DID))
         {
             this.userData = new BSKYUser(this.DID, this.Handle);
-            BSKYUser.cache.set(this.DID, this.userData);
             newUserCache.set(this.DID, this.userData);
             this.userData.posts.set(this.postID, this);
         }
@@ -574,6 +597,7 @@ class BSKYUser
 {
     static cache = new Map();
     static handleCache = new Map();
+    static didCache = new Map();
 
     following_state = -1;
     onFollowingChanged = new EventTarget();
@@ -586,7 +610,8 @@ class BSKYUser
     {
         if(this.did == myDID) {
             this.following_state = 0;
-            return 1; }
+            return 1;
+		}
         return this.following_state;
     }
 
@@ -594,10 +619,18 @@ class BSKYUser
     {
         this.did = srcDID;
         this.handle = srcHandle;
-        if(!BSKYUser.handleCache.has(srcDID))
-        {
-            BSKYUser.handleCache.set(srcDID, srcHandle);
-        }
+
+		BSKYUser.cache.set(srcDID, this);
+        BSKYUser.handleCache.set(srcDID, srcHandle);
+        BSKYUser.didCache.set(srcHandle, srcDID);
+    }
+
+    static createGetUser(srcDID, srcHandle)
+    {
+        let existingUser = BSKYUser.cache.get(srcDID);
+        if(existingUser != null) { return existingUser; }
+
+        return new BSKYUser(srcDID, srcHandle);
     }
 
     setFollowing(followState)
@@ -639,6 +672,11 @@ class BSKYUser
         return BSKYUser.handleCache.get(did);
     }
 
+    static getDIDFromHandle(handle)
+    {
+        return BSKYUser.didCache.get(handle);
+    }
+
     static async updateNewAddsFollowState(newUserCache)
     {
         const addCnt = newUserCache.size;
@@ -665,7 +703,40 @@ class BSKYUser
     }
 }
 
+class BSKYProfileState
+{
+    static cache = new Map();
+    likesFeedElem = null;
 
+    constructor(handle)
+    {
+        BSKYProfileState.cache.set(handle, this);
+    }
+
+    get likesListActive()
+    {
+        if(this.likesFeedElem == null) { return false; }
+
+        return this.likesFeedElem.classList.contains('bskyEN-tab-on');
+    }
+
+    static userExistsAndLikesActive(handle)
+    {
+        let existingUser = BSKYProfileState.cache.get(handle);
+        if(existingUser == null) { return false; }
+        existingUser.likesListActive;
+    }
+
+    static createGet(handle)
+    {
+        let existingUser = BSKYProfileState.cache.get(handle);
+        if(existingUser){return existingUser;}
+
+        const newUser = new BSKYProfileState(handle);
+        BSKYProfileState.cache.set(handle, newUser);
+        return newUser;
+    }
+}
 
 /*** PROCESSING ***/
 async function processFeedItem(feedItem)
@@ -746,7 +817,7 @@ function onPanelsAdded(addItems)
 
 var useLikesList = false;
 
-function processProfileTabs(profileScreen)
+function processProfileTabs(profileScreen, handle)
 {
     let tabList = profileScreen.querySelector('div[role="tablist"][data-testid="profilePager"] div[data-testid="profilePager-selector"]');
 
@@ -764,11 +835,17 @@ function processProfileTabs(profileScreen)
             let tab = tabs[t];
             let tabBottom = tab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
 
-            if(tabBottom && tabBottom?.style)
+            if(tabBottom && tabBottom.hasAttribute('style'))
             {
                 let bottomTabColor = tabBottom.style.backgroundColor;
                 let selTextColor = tabBottom.parentElement.style.color;
 
+                let bannerImg = profileScreen.querySelector('div[data-testid="userBannerImage"]');
+
+                if(bannerImg)
+                {
+                    document.documentElement.style.setProperty('--bskyEN-tab-hover-var', bannerImg.style.backgroundColor);
+                }
                 document.documentElement.style.setProperty("--bskyEN-tab-on-var", bottomTabColor);
                 document.documentElement.style.setProperty("--bskyEN-tabtext-on-var", selTextColor);
 
@@ -777,10 +854,13 @@ function processProfileTabs(profileScreen)
 
         }
 
+        const profileState = BSKYProfileState.createGet(handle);
 
         let likesTab = repliesTab.cloneNode(true);
         likesTab.setAttribute('data-testid','profilePager-selector-25');
+        addClassName(likesTab, 'bskyEN-tab');
         let likesBottom = likesTab.firstElementChild.querySelector('div[data-testid^="profilePager"] > div');
+        profileState.likesFeedElem = likesBottom;
         let likesBottomHolder = likesBottom.parentElement;
 
         document.documentElement.style.setProperty("--bskyEN-tabtext-off-var", likesBottomHolder.style.color);
@@ -820,25 +900,77 @@ function processProfileTabs(profileScreen)
     }
 }
 
-async function onNewPageLoaded()
+function onProfileVisited(handle)
 {
-    useLikesList = false;
+    const profileState = BSKYProfileState.createGet(handle);
+    useLikesList = profileState.likesListActive;
+}
+
+async function onNewPageLoaded(newLocation)
+{
+    let visitingProfile = false;
+    let newPageURL = newLocation;
+    let handle = null;
+    if(newPageURL.includes('/profile/'))
+    {
+        let profileSplit = newPageURL.split('/profile/').at(-1);
+        let extraSplit = profileSplit.split('/');
+        handle = extraSplit[0];
+        useLikesList = false;
+
+        if(extraSplit.length < 2)
+        {
+            visitingProfile = true;
+            onProfileVisited(handle);
+        }
+
+    }
+
     let root = await awaitElem(document, 'body #root main', argsChildAndSub);
     let panelsRoot = root.parentElement;
     if(!addHasModified(panelsRoot)) {
         onPanelsAdded(panelsRoot.childNodes);
         watchForAddedNodes(panelsRoot, false, { attributes: false, childList: true }, onPanelsAdded);
     }
+    if(visitingProfile == true && handle != null)
+    {
+        awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(async (profileScreen) => {
+            await setupScreenWatch(profileScreen);
+            processProfileTabs(profileScreen, handle);
+        });
+    }
+    if(handle != null && newPageURL.includes('/liked-by'))
+    {
+        awaitElem(root, 'div[style*="display: flex"] div[style*="removed-body-scroll"]:has(> div > button[type="button"]) > div[style*="center;"]', argsChildAndSub).then((likeTextElem)=> {
+               if(!addHasModified(likeTextElem))
+               {
+                   let ofElem = document.createElement('button');
+                   ofElem.innerText = "Only Show Follows";
+                   addClassName(ofElem, "bskyEN-likesOF");
+                   likeTextElem.parentElement.appendChild(ofElem);
+                   if(is_chrome === true)
+                   {
+                       addClassName(ofElem, "bskyEN-likesOF-chrome");
+                       ofElem.setAttribute('title', `"Show Only From Follows" Doesn't work consistently on Chrome due to aggressive network caching.   You can clear cache to try and force it. I've hidden it in Chrome because of that. Use Firefox! It's much better!`);
+                   }
 
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileScreen"]', argsChildAndSub).then(async (profileScreen) => {
-        await setupScreenWatch(profileScreen);
-        processProfileTabs(profileScreen);
-    });
-    awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileListScreen"]', argsChildAndSub).then(setupScreenWatch);
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="postThread"])', argsChildAndSub).then(setupFeedWatch);
-    awaitElem(root, 'div[style*="display: flex"] [data-testid="profileFeedScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="feedItem-"])', argsChildAndSub).then(setupFeedWatch);
-    awaitElem(root, 'div[style*="display: flex"]:has(div[style*="removed-body-scroll"] div[role="tablist"]) div[style*="removed-body-scroll"]:has(a[href^="/profile/"]) > div', argsChildAndSub).then(setupFeedWatch);
+              ofElem.addEventListener('click', function(e) {
+                          if(window.location.href.split('?')[0].endsWith('/liked-by'))
+                         {
+                              let randomNumber = Math.floor(Math.random() * 10000);
+                              window.location.reload(true);
+                              window.location.href = window.location.href.split('?')[0] + `?onlyfollows=${randomNumber}`;
+                          }
+                   });
+               }
+        });
+    }
+
+	awaitElem(root, '[data-testid="HomeScreen"]', argsChildAndSub).then(setupScreenWatch);
+	awaitElem(root, 'div[style*="display: flex"] [data-testid="profileListScreen"]', argsChildAndSub).then(setupScreenWatch);
+	awaitElem(root, 'div[style*="display: flex"] [data-testid="postThreadScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="postThread"])', argsChildAndSub).then(setupFeedWatch);
+	awaitElem(root, 'div[style*="display: flex"] [data-testid="profileFeedScreen"] div[style*="removed-body-scroll"] > div:has(div[data-testid^="feedItem-"])', argsChildAndSub).then(setupFeedWatch);
+	awaitElem(root, 'div[style*="display: flex"]:has(div[style*="removed-body-scroll"] div[role="tablist"]) div[style*="removed-body-scroll"]:has(a[href^="/profile/"]) > div', argsChildAndSub).then(setupFeedWatch);
 }
 
 async function tryProcessFeedData(response)
@@ -1331,6 +1463,7 @@ async function getLikedPosts(likesRec, feedObj)
     }
 }
 
+
 var lastCursor = "";
 
 unsafeWindow.fetch = exportFunction(async (...args) => {
@@ -1339,80 +1472,149 @@ unsafeWindow.fetch = exportFunction(async (...args) => {
     let isGetSession = (resource?.constructor === URL && resource.href.includes('server.getSession'));
     let isRequest = resource?.constructor === Request;
 
-    if(!isGetSession && isRequest && resource.url.includes('repo.createRecord'))
-    {
-        resource.clone().json().then(checkCreateRecordForFollow);
-    }
     if(isGetSession)
     {
         if(config?.headers?.has("authorization"))
         {
             bear = config?.headers?.get("authorization");
         }
-    }
-    else if(useLikesList === true && isRequest && resource.url.includes('.getAuthorFeed?') && resource.url.includes('=posts_with_replies'))
-    {
-        let did = resource.url.split('actor=').at(-1).split('&')[0];
 
-        if(!resource.url.includes('cursor='))
-        {
-            lastCursor = "";
-        }
-
-        let feedObj = {feed:[]};
-        let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
-        const likesRecResp = await originalFetch(likesRecReq, config);
-        let likesRec = await likesRecResp.json();
-        if(likesRec)
-        {
-            let recordCnt = likesRec.records.length;
-            if(Object.hasOwn(likesRec, 'cursor')) {
-                lastCursor = likesRec.cursor;
-                feedObj.cursor = lastCursor;
-            }
-            if(recordCnt > 0)
-            {
-                await getLikedPosts(likesRec, feedObj);
-                if(feedObj.feed.length > 0)
-                {
-                    tryProcessFeedData(feedObj);
-                    modifyTagsText(feedObj);
-                }
-            }
-            if(recordCnt < 25)
-            {
-                delete feedObj.cursor;
-            }
-        }
-        return new Response(JSON.stringify(feedObj), {
-            status: likesRecResp.status,
-            statusText: likesRecResp.statusText,
-            headers: likesRecResp.headers
-        });
-    }
-
-    const response = await originalFetch(resource, config);
-    if(isGetSession)
-    {
-        var sessionData = await response.clone().json();
+        const sessionResp = await originalFetch(resource, config);
+        let sessionData = await sessionResp.clone().json();
         myDID = sessionData?.did;
+        return sessionResp;
     }
-    else if(isRequest && resource.url.includes('bsky.feed.'))
+    else if(isRequest)
     {
-        let json = await response.json();
-        tryProcessFeedData(json);
-        modifyTagsText(json);
+        if(useLikesList === true && resource.url.includes('.getAuthorFeed?') && resource.url.includes('=posts_with_replies'))
+        {
+            let did = resource.url.split('actor=').at(-1).split('&')[0];
 
-        return new Response(JSON.stringify(json), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers
-        });
+            if(!resource.url.includes('cursor='))
+            {
+                lastCursor = "";
+            }
+
+            let feedObj = {feed:[]};
+            let likesRecReq = new Request(`https://bsky.social/xrpc/com.atproto.repo.listRecords?collection=app.bsky.feed.like&limit=25&reverse=false&cursor=${lastCursor}&repo=${did}`, resource);
+            const likesRecResp = await originalFetch(likesRecReq, config);
+            let likesRec = await likesRecResp.json();
+
+            if(likesRec)
+            {
+                let recordCnt = likesRec.records.length;
+                if(Object.hasOwn(likesRec, 'cursor')) {
+                    lastCursor = likesRec.cursor;
+                    feedObj.cursor = lastCursor;
+                }
+                if(recordCnt > 0)
+                {
+                    await getLikedPosts(likesRec, feedObj);
+                    if(feedObj.feed.length > 0)
+                    {
+                        tryProcessFeedData(feedObj);
+                        modifyTagsText(feedObj);
+                    }
+                }
+                if(recordCnt < 25) { delete feedObj.cursor; }
+            }
+
+            return new Response(JSON.stringify(feedObj), { status: likesRecResp.status, statusText: likesRecResp.statusText, headers: likesRecResp.headers });
+        }
+        else if(resource.url.includes('bsky.feed.'))
+        {
+            if(resource.url.includes('.getLikes') === false)
+            {
+                const response = await originalFetch(resource, config);
+                let json = await response.json();
+                tryProcessFeedData(json);
+                modifyTagsText(json);
+
+                return new Response(JSON.stringify(json), { status: response.status, statusText: response.statusText, headers: response.headers });
+            }
+            else
+            {
+               // let mutableHeaders = new Headers();
+               // resource.headers.forEach((value, key, parent) => mutableHeaders.set(key, value));
+              //  mutableHeaders.set('cache-control','no-cache');
+
+               // resource = new Request(resource, {headers: mutableHeaders});
+                let response = null;
+
+                if(window.location.href.includes('?onlyfollows'))
+                {
+                    let json = {likes:[]};
+
+                    let likesReqURL = resource.url.replace('limit=30','limit=100');
+                    if(!likesReqURL.includes('cursor=')) { likesReqURL += '&cursor=0'; }
+
+                    let muteLikes = [];
+                    let hasCursor = true;
+                    let lastCursor = "";
+                    let cursorRegex = /\&cursor=([^\&+])+/;
+
+                    while(hasCursor === true)
+                    {
+                        hasCursor = false;
+                        const randomNumber = Math.floor(Math.random() * 100000);
+                        let newLikeListReq = likesReqURL.replace(cursorRegex, lastCursor) + `&rand=${randomNumber}`;
+
+                        resource = new Request(newLikeListReq, resource);
+                        response = await originalFetch(resource, config);
+
+                        if(response.ok === true)
+                        {
+                            json = await response.json();
+
+                            if(Object.hasOwn(json, 'likes'))
+                            {
+                                const filteredLikes = json.likes.filter((like)=> Object.hasOwn(like.actor.viewer, 'following'));
+                                muteLikes = muteLikes.concat(filteredLikes);
+
+                                if(Object.hasOwn(json, 'cursor'))
+                                {
+                                    hasCursor = true;
+                                    lastCursor = '&cursor=' + json.cursor;
+                                }
+                            }
+                        }
+                    }
+
+                    json.likes = muteLikes;
+                    delete json.cursor;
+
+                    response = new Response(JSON.stringify(json), { status: response.status, statusText: response.statusText, headers: response.headers });
+                    return response;
+                }
+               /* else {
+                    console.log("don't likes  filter");
+                    const randomNumber = Math.floor(Math.random() * 100000);
+                    let likesReqURL = resource.url.replace('limit=30','limit=100') + `&rand=${randomNumber}`;
+                    response = await originalFetch(resource, config);
+                }
+
+                mutableHeaders = new Headers();
+                response.headers.forEach((value, key, parent) => mutableHeaders.set(key, value));
+                mutableHeaders.set('cache-control','no-cache');
+
+                let newlikesResp = new Response(response.body, { status: response.status, statusText: response.statusText, headers: mutableHeaders });
+                console.log(newlikesResp);
+                return newlikesResp;*/
+            }
+        }
+        else if(resource.url.includes('repo.createRecord'))
+        {
+            resource.clone().json().then(checkCreateRecordForFollow);
+            const recordResp = await originalFetch(resource, config);
+            return recordResp;
+        }
     }
-    return response;
 
+    const defaultResp = await originalFetch(resource,config);
+    return defaultResp;
 }, unsafeWindow);
 
+window.fetch = unsafeWindow.fetch;
 
 const filterVideoSources = function (m3u8)
 {
@@ -1480,8 +1682,8 @@ unsafeWindow.XMLHttpRequest.prototype.open = exportFunction(function(method, url
 
 
 /*** EVENTS ***/
-unsafeWindow.addEventListener('locationchange', function () {
-    onNewPageLoaded();
+unsafeWindow.addEventListener('locationchange', function (e) {
+    onNewPageLoaded(e.target.location.href);
 });
 
 (() => {
@@ -1512,6 +1714,6 @@ unsafeWindow.addEventListener('locationchange', function () {
     console.log("start userscript");
     let root = await awaitElem(document, 'body #root', argsChildAndSub);
     initializeCtxMenu();
-    onNewPageLoaded();
+    onNewPageLoaded(unsafeWindow.location.href);
 
 })();
